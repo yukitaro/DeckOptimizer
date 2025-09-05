@@ -1,0 +1,3 @@
+[submodule "frontend/deck-optimizer-frontend"]
+	path = frontend/deck-optimizer-frontend
+	url = https://github.com/yukitaro/DeckOptimizerFrontend

@@ -20,6 +20,13 @@ Route::get('/cards/{num_cards}', [CardDataController::class, 'retrieve']);
     return $matching_cards;
 });*/
 
+Route::get('/cards/name/{name}/{num_cards?}', function (string $name, int $num_cards) {
+    return CardData::where('rarity', 'common')
+    ->where('name', 'LIKE', "%{$name}%")
+    ->limit($num_cards)
+    ->get();
+});
+
 Route::get('/cardsJSON/{num_cards}/{colors?}', function (int $num_cards, string $colors = 'W') {
 
     $colorInDb = "";
