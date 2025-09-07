@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class CardDataNormalized extends Model
+{
+    /** 
+     * TODO: I could/should consider adding the hasMany relationship to the normalized card data
+     * to allow easy reference back to see which decks a given card is in.
+     * - migration to add a column
+     * - hasMany relationship here
+     * - consider having a card_versions table to associate data in this table back to the different version
+     *   - can probably just execute a search for this though, don't necessarily need a table?
+    */
+    
+    /**
+     * The table associated with the model
+     */
+    protected $table = 'card_data_normalized';
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'name',
+        'type',
+        'colors',
+        'mana_cost',
+        'rarity',
+        'text',
+        'power',
+        'toughness',
+        'image_url_to_use'
+    ];
+}

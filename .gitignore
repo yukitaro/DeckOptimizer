@@ -20,7 +20,8 @@
 /storage/pail
 /vendor
 /data/*.csv
-/data/*.json
+/data/AllSetFiles/*.json
+/data/AllPrintingsCSVFiles_0906/*.csv
 Homestead.json
 Homestead.yaml
 Thumbs.db

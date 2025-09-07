@@ -3,7 +3,9 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CardDataController;
+use App\Http\Controllers\DeckController;
 use App\Models\CardData;
+use App\Models\CardDataFromSetData;
 
 Route::get('/', function () {
     return view('welcome');
@@ -20,12 +22,34 @@ Route::get('/cards/{num_cards}', [CardDataController::class, 'retrieve']);
     return $matching_cards;
 });*/
 
-Route::get('/cards/name/{name}/{num_cards?}', function (string $name, int $num_cards) {
-    return CardData::where('rarity', 'common')
+Route::get('/cards/name/{name}/rarities/{rarities?}', function (string $name, string $rarities) {
+
+    $limit = request('limit');
+
+    if ($rarities === '') {
+        $rarities = "common, uncommon, rare, mythic";
+    }
+
+    return CardData::whereIn('rarity', explode(',', $rarities))
     ->where('name', 'LIKE', "%{$name}%")
-    ->limit($num_cards)
+    ->limit($limit)
     ->get();
 });
+
+Route::get('/cardsfromsets/name/{name}/rarities/{rarities?}', function (string $name, string $rarities) {
+
+    $limit = request('limit');
+
+    if ($rarities === '') {
+        $rarities = "common, uncommon, rare, mythic";
+    }
+
+    return CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
+    ->where('name', 'LIKE', "%{$name}%")
+    ->limit($limit)
+    ->get();
+});
+
 
 Route::get('/cardsJSON/{num_cards}/{colors?}', function (int $num_cards, string $colors = 'W') {
 
@@ -33,19 +57,19 @@ Route::get('/cardsJSON/{num_cards}/{colors?}', function (int $num_cards, string 
 
     switch ($colors) {
         case 'islands':
-            $colorInDb = '[\'U\']';
+            $colorInDb = 'U';
             break;
         case 'plains':
-            $colorInDb = '[\'W\']';
+            $colorInDb = 'W';
             break;
         case 'swamps':
-            $colorInDb = '[\'B\']';
+            $colorInDb = 'B';
             break;
         case 'mountains':
-            $colorInDb = '[\'R\']';
+            $colorInDb = 'R';
             break;
         case 'forests':
-            $colorInDb = '[\'G\']';
+            $colorInDb = 'G';
             break;
 
     }
@@ -56,4 +80,18 @@ Route::get('/cardsJSON/{num_cards}/{colors?}', function (int $num_cards, string 
     ->get();
 
     return $matching_cards;
+});
+
+
+Route::post('/deck', [DeckController::class, 'store']);
+
+use Illuminate\Http\Request;
+
+ 
+
+Route::get('/token', function (Request $request) {
+    $token = $request->session()->token();
+    $token = csrf_token();
+
+    return $token;
 });

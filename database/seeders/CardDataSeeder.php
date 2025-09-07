@@ -18,7 +18,7 @@ class CardDataSeeder extends Seeder
      */
     public function run(): void
     {
-        $csvPath = base_path('data/all_mtg_cards_09012025.csv');
+        $csvPath = base_path('data/AllPrintingsCSVFiles_0906/cards.csv');
         $csv = Reader::createFromPath($csvPath, 'r');
 
         // Set the header offset if your CSV has a header row (e.g., first row is headers)
@@ -34,19 +34,22 @@ class CardDataSeeder extends Seeder
             //$aParsedMagicSet = this.createNewSet($record);
             $aParsedCardData = new CardData([
                 'name' => $record['name'],
-                'set_name' => $record['set_name'],
-                'official_set_id' => $record['set'],
+                //'set_name' => $record['set_name'], Will need to populate this over from set_data
+                'official_set_id' => $record['setCode'],
                 'card_id' => $record['number'],
-                'card_uuid' => $record['id'],
-                'card_multiverse_id' => $record['multiverse_id'],
-                'type' => $record['type'],
+                'card_uuid' => $record['uuid'],
                 'colors' => $record['colors'],
-                'mana_cost' => $record['mana_cost'],
+                'colorIdentities' => $record['colorIdentity'],
+                'keywords' => $record['keywords'],
+                'mana_cost' => $record['manaCost'],
+                'mana_value' => $record['manaValue'],
+                'power' => $record['power'],
+                'printings' => $record['printings'],
                 'rarity' => $record['rarity'],
                 'text' => $record['text'],
-                'power' => $record['power'],
                 'toughness' => $record['toughness'],
-                'image_url' => $record['image_url']
+                'type' => $record['type'],
+                'types' => $record['types']
             ]);
             //$aMagicSet = app\Models\MagicSetData;
             //$aMagicSet->set_name = $aParsedMagicSet->set_name;
