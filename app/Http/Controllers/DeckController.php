@@ -33,51 +33,72 @@ class DeckController extends Controller
      */
     public function store(Request $request)
     {
-        //$requestString = implode(", ", $request->all());
-        //echo 'Complete request: ' . $requestString . '\n';
-/*         echo 'Got this request to create deck with name: ' . $request->input('deckName') . '\n';
-        echo('With these cards: ' . $request->input('deckName') . '\n');
+        $errors = [];
+        $matchesFound = [];
+        $index = 0;
+        $cardCountInDeck = 0;
 
+        $cardLinesToParse = preg_split('/\R/', $request->input('deckData'));
 
         $owner_login = 'yukitaro';
 
-        $owner_data = DeckOwner::where('owner_login', $owner_login)
-        ->get();
+        $owner_data = DeckOwner::firstOrCreate(
+            ['owner_login' => $owner_login],
+            ['free_text' => 'haha these are all mine', 'deck_id' => 1]
+        );
 
-        if ($owner_data->isEmpty()) {
-            $owner_data = DeckOwner::create([
-                'owner_login' => $owner_login,
-                'free_text' => 'haha these are all mine'
-            ]);
-        } */
+        
+        $owner_data->save();
+       
+        $importedDeck = $owner_data->ownedDecks()->create([
+            'deck_name' => $request['deckName'],
+            'description' => $request['deckDescription'],
+            'external_link' => $request['deckLink'],
+            'num_cards' => $request['num_cards'] ?? 0
+        ]);
 
-        // deckData: deckSomething.value,
-
-        $cardLinesToParse = preg_split('/\R/', $request->input('deckData'));
+        $importedDeck->save();
 
         foreach ($cardLinesToParse as $cardLine) {
             $pattern = "/(\d){1,2}\s{1}(.*)/";
             preg_match($pattern, $cardLine, $matches);
 
-            $matchingCard = CardDataNormalized::where('name', $matches[2])
-                ->get();
+            if (!isset($matches[2])) {
+                $errors[] = [
+                    'line' => $index + 1,
+                    'input' => $cardLine,
+                    'error' => 'Line format invalid or incomplete'
+                ];
+                continue;
+            }
 
-            if ($matchingCard->isEmpty()) {
-                echo "Bummer, couldn't find a match for: " . $matches[2] . "\n";
+            $matchingCard = CardDataNormalized::where('name', $matches[2])
+                ->first();
+
+            if (!$matchingCard) {
+                $errors[] = [
+                    'line' => $index + 1,
+                    'input' => $matches[2],
+                    'error' => 'No matching card found for: ' . $matches[2]
+                ];
             } else {
-                echo "Found a matching card: " . $matchingCard[0]->name . "\n";
+                $cardCountInDeck += $matches[1];
+                $matchesFound[] = $matchingCard->name;
+                $importedDeck->cardsInDeck()->create([
+                    'card_name' => $matches[2],
+                    'card_count' => $matches[1],
+                    'image_url' => $matchingCard['image_url_to_use'],
+                    'card_data_normalized_id' => $matchingCard->id
+                ]);
+                $importedDeck->save();
             }
         }
 
-/*         DB::transaction(function use ($request)) {
-            $managed_deck = DeckManagement::create([
-                'deck_name' => $request->input('deckName'),
-                'description' => $request->input('deckDescription'),
-                'external_link' => $request->input('deckLink'),
-            ]);
-
-            }
-         */
+        return response()->json([
+            'status' => 'completed',
+            'matched_cards' => $matchesFound,
+            'errors' => $errors,
+        ]);
     }
 
     /**

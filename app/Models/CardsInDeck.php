@@ -10,13 +10,26 @@ class CardsInDeck extends Model
 {
     protected $table = 'cards_in_deck';
 
-    public function belongsTo() : BelongsTo
+    public function deckManagedBy() : BelongsTo
     {
-        return $this->belongsTo(DeckManagement::class);
+        return $this->belongsTo(DeckManagement::class, 'cards_in_deck_id');
     }
 
-    public function normalizedCard(): HasOne
+    public function normalizedCard(): BelongsTo
     {
-        return $this->hasOne(CardDataNormalized::class);
+        return $this->belongsTo(CardDataNormalized::class, 'card_data_normalized_id');
     }
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'card_name',
+        'card_count',
+        'image_url',
+        'deck_management_id',
+        'card_data_normalized_id'
+    ];    
 }

@@ -51,7 +51,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('type');
             $table->string('colors');
-            $table->string('mana_cost');
+            $table->string('mana_cost')->nullable()->default('');
             $table->string('rarity')->nullable();
             $table->mediumText('text')->nullable();
             $table->string('power')->nullable();

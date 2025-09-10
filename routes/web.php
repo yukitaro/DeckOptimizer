@@ -6,6 +6,9 @@ use App\Http\Controllers\CardDataController;
 use App\Http\Controllers\DeckController;
 use App\Models\CardData;
 use App\Models\CardDataFromSetData;
+use App\Models\CardsInDeck;
+use App\Models\DeckManagement;
+
 
 Route::get('/', function () {
     return view('welcome');
@@ -85,13 +88,29 @@ Route::get('/cardsJSON/{num_cards}/{colors?}', function (int $num_cards, string 
 
 Route::post('/deck', [DeckController::class, 'store']);
 
+/* Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
+        $deck = DeckManagement::with('cardsInDeck')->find($deck_id);
+
+    if (!$deck) {
+        return response()->json(['error' => 'Deck not found'], 404);
+    }
+
+    return response()->json($deck->cardsInDeck);
+});
+ */
+Route::get('/decks', function () {
+    $limit = request('limit');
+
+    return DeckManagement::limit($limit)
+        ->get();
+});
+
 use Illuminate\Http\Request;
 
- 
-
-Route::get('/token', function (Request $request) {
-    $token = $request->session()->token();
-    $token = csrf_token();
-
-    return $token;
+Route::post('/csrf-check', function (Request $request) {
+    return response()->json([
+        'message' => 'CSRF token validated successfully.',
+        'session_id' => session()->getId(),
+        'user' => auth()->user(),
+    ]);
 });

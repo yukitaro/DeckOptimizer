@@ -16,9 +16,8 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         $this-call([
-            MagicSetSeeder::class,
-            CardDataSeeder::class,
-            CollectionSeeder::class
+            SetDataSeeder::class,
+            CardDataNormalizedSeeder::class,
         ]);
     }
 }

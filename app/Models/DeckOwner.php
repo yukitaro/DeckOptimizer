@@ -14,6 +14,17 @@ class DeckOwner extends Model
     public function ownedDecks(): HasMany
     {
         // trying out the ability to define the foreign key name as a param
-        return $this->hasMany(DeckManagement::class, 'deck_id');
+        return $this->hasMany(DeckManagement::class, 'deck_owner_id');
     }
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'owern_login',
+        'free_text',
+        'deck_id',
+    ];    
 }

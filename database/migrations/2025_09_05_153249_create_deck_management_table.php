@@ -25,13 +25,16 @@ return new class extends Migration
             $table->foreignId('cards_in_deck_id');
             $table->string('deck_name');
             $table->string('description');
-            $table->string('external_link');
-            $table->string('num_cards');
+            $table->string('external_link')->nullable()->default('');
+            $table->integer('num_cards')->nullable()->default(0);
             $table->timestamps();
         });
 
         Schema::create('cards_in_deck', function (Blueprint $table) {
             $table->id()->primary();
+            $table->string('card_name');
+            $table->integer('card_count');
+            $table->string('image_url')->nullable()->default('');
             $table->foreignId('deck_management_id');
             $table->foreignId('card_data_normalized_id');
         });        

@@ -22,6 +22,7 @@
 /data/*.csv
 /data/AllSetFiles/*.json
 /data/AllPrintingsCSVFiles_0906/*.csv
+/deckdb
 Homestead.json
 Homestead.yaml
 Thumbs.db
