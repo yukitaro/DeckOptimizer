@@ -16,16 +16,11 @@ Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
         return $group->sum('card_count');
     });
 
-    dd($countMap);
-
     // Step 3: Get normalized cards via hasManyThrough
     $normalizedCards = $deck->normalizedCards;
-    dd($deck->normalizedCards);
 
     // Step 4: Attach card_count to each normalized card
     $enriched = $normalizedCards->map(function ($card) use ($countMap) {
-        $normalizedCards->pluck('id');
-
         return [
             'id' => $card->id,
             'name' => $card->name,

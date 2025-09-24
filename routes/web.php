@@ -69,18 +69,17 @@ Route::get('/cardsfromsets/{setnames}/{rarities?}', function (string $setnames, 
         $rarities = "common,uncommon,rare,mythic";
     }
 
-    if ($colorFilters === '') {
-        $colorFilters = "U,W,G,R,B";
-    }
-
-
-     return CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
-        ->wherein('colors', explode(',', $colorFilters))
+    $query = CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
         ->where('set_name', '=', "$setnames")
         ->whereRaw('number_in_set REGEXP ?', ['^[0-9]+$'])
-        ->whereNotNull('card_multiverse_id')
-        ->limit($limit)
-        ->get();
+        ->whereNotNull('card_multiverse_id');
+
+    // Only apply color filtering if colorFilters is provided and not empty
+    if ($colorFilters && $colorFilters !== '') {
+        $query->whereIn('colors', explode(',', $colorFilters));
+    }
+
+    return $query->limit($limit)->get();
 });
 
 Route::get('/cardsJSON/{num_cards}/{colors?}', function (int $num_cards, string $colors = 'W') {

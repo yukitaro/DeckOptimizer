@@ -15,9 +15,21 @@ class CorsMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $response = $next($request);
+        // Handle preflight OPTIONS request
+        if ($request->isMethod('OPTIONS')) {
+            $response = response('', 200);
+        } else {
+            $response = $next($request);
+        }
 
-        $response->headers->set('Access-Control-Allow-Origin', 'http://localhost:3000');
+        // Allow multiple origins for development
+        $allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'];
+        $origin = $request->headers->get('Origin');
+        
+        if (in_array($origin, $allowedOrigins)) {
+            $response->headers->set('Access-Control-Allow-Origin', $origin);
+        }
+        
         $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
         $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, X-Auth-Token, Origin, Authorization, X-CSRF-TOKEN, x-xsrf-token');
         $response->headers->set('Access-Control-Allow-Credentials', 'true');
