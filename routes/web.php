@@ -8,6 +8,7 @@ use App\Models\CardData;
 use App\Models\CardDataFromSetData;
 use App\Models\CardsInDeck;
 use App\Models\DeckManagement;
+use App\Models\SetData;
 
 
 Route::get('/', function () {
@@ -25,15 +26,21 @@ Route::get('/cards/{num_cards}', [CardDataController::class, 'retrieve']);
     return $matching_cards;
 });*/
 
+Route::get('/sets/{cardminimum?}', function (int $cardminimum = 85) {
+    return SetData::where('total_cards', '>', $cardminimum)
+    ->get();
+});
+
 Route::get('/cards/name/{name}/rarities/{rarities?}', function (string $name, string $rarities) {
 
     $limit = request('limit');
 
     if ($rarities === '') {
-        $rarities = "common, uncommon, rare, mythic";
+        $rarities = "common,uncommon,rare,mythic";
     }
 
-    return CardData::whereIn('rarity', explode(',', $rarities))
+    //return CardData::whereIn('rarity', explode(',', $rarities))
+    return CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
     ->where('name', 'LIKE', "%{$name}%")
     ->limit($limit)
     ->get();
@@ -44,7 +51,7 @@ Route::get('/cardsfromsets/name/{name}/rarities/{rarities?}', function (string $
     $limit = request('limit');
 
     if ($rarities === '') {
-        $rarities = "common, uncommon, rare, mythic";
+        $rarities = "common,uncommon,rare,mythic";
     }
 
     return CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
@@ -53,6 +60,28 @@ Route::get('/cardsfromsets/name/{name}/rarities/{rarities?}', function (string $
     ->get();
 });
 
+Route::get('/cardsfromsets/{setnames}/{rarities?}', function (string $setnames, string $rarities = '') {
+
+    $limit = request('limit');
+    $colorFilters = request('colorFilters');
+
+    if ($rarities === '') {
+        $rarities = "common,uncommon,rare,mythic";
+    }
+
+    if ($colorFilters === '') {
+        $colorFilters = "U,W,G,R,B";
+    }
+
+
+     return CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
+        ->wherein('colors', explode(',', $colorFilters))
+        ->where('set_name', '=', "$setnames")
+        ->whereRaw('number_in_set REGEXP ?', ['^[0-9]+$'])
+        ->whereNotNull('card_multiverse_id')
+        ->limit($limit)
+        ->get();
+});
 
 Route::get('/cardsJSON/{num_cards}/{colors?}', function (int $num_cards, string $colors = 'W') {
 
