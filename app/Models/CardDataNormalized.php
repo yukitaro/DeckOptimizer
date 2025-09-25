@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CardDataNormalized extends Model
 {
@@ -19,6 +20,11 @@ class CardDataNormalized extends Model
      * The table associated with the model
      */
     protected $table = 'card_data_normalized';
+
+    public function sourcePrinting() : BelongsTo
+    {
+        return $this->belongsTo(CardDataFromSetData::class, 'source_printing_id');
+    }    
 
     /**
      * The attributes that are mass assignable.

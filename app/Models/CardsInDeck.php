@@ -30,6 +30,7 @@ class CardsInDeck extends Model
         'card_count',
         'image_url',
         'deck_management_id',
-        'card_data_normalized_id'
+        'card_data_normalized_id',
+        'updated_at'
     ];    
 }

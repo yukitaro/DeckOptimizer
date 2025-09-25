@@ -41,7 +41,6 @@ class DeckManagement extends Model
      */
     protected $fillable = [
         'deck_owner_id',
-        'cards_in_deck_id',
         'deck_name',
         'description',
         'external_link',

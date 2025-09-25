@@ -54,7 +54,9 @@ class DeckController extends Controller
             'deck_name' => $request['deckName'],
             'description' => $request['deckDescription'],
             'external_link' => $request['deckLink'],
-            'num_cards' => $request['num_cards'] ?? 0
+            'num_cards' => $request['num_cards'] ?? 0,
+            'archetype' => $request['deckArchetype'] ?? '',
+            'format' => $request['deckFormat'] ?? 'pauper'
         ]);
 
         $importedDeck->save();
