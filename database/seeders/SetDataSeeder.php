@@ -7,6 +7,7 @@ use Illuminate\Database\Seeder;
 
 use App\Models\SetData;
 use App\Models\CardDataFromSetData;
+use App\Models\CardMetadata;
 
 use Cerbero\JsonParser\JsonParser;
 use function Cerbero\JsonParser\JsonParser\parseJson;
@@ -40,7 +41,6 @@ class SetDataSeeder extends Seeder
                         'official_set_code' => $value['name'],
                         'release_date' => $value['releaseDate'],
                         'total_cards' => $value['totalSetSize']
-
                     ]);  
 
                     $aParsedSetData->save();
@@ -51,8 +51,18 @@ class SetDataSeeder extends Seeder
                             foreach ($aCardData as $aCardFromSet) {
                                 $identifiers = $aCardFromSet['identifiers'] ?? [];
                                 $multiverseId = $identifiers['multiverseId'] ?? null;
+                                $purchaseUrls = $aCardFromSet['purchaseUrls'] ?? [];
 
                                 $imageUrl = $multiverseId ? "https://gatherer.wizards.com/Handlers/Image.ashx?multiverseid=" . $multiverseId . "&type=card" : null;
+
+                                $metadata = new CardMetadata([
+                                    'cardKingdomId' => $identifiers['cardKingdomId'] ?? null,
+                                    'multiverseId' => $multiverseId,
+                                    'scryfallId' => $identifiers['scryfallId'] ?? null,
+                                    'tcgplayerProductId' => $identifiers['tcgplayerProductId'] ?? null,
+                                    'tcgplayerPurchaseUrl' => $purchaseUrls['tcgplayer'] ?? null
+                                ]);
+                                $metadata->save();
 
                                 $aParsedSetData->cardsInSet()->create([
                                     'name' => $this->getField($aCardFromSet, 'name'),
@@ -66,9 +76,11 @@ class SetDataSeeder extends Seeder
                                     'keywords' => $this->getField($aCardFromSet, 'keywords', true),
                                     'mana_cost' => $this->getField($aCardFromSet, 'manaCost'),
                                     'mana_value' => $this->getField($aCardFromSet, 'manaValue'),
+                                    'card_metadata_id' => $metadata->id,
                                     'power' => $this->getField($aCardFromSet, 'power'),
                                     'printings' => $this->getField($aCardFromSet, 'printings', true),
                                     'rarity' => $this->getField($aCardFromSet, 'rarity'),
+                                    'set_code' => $aParsedSetData['setCode'],
                                     'text' => $this->getField($aCardFromSet, 'text'),
                                     'toughness' => $this->getField($aCardFromSet, 'toughness'),
                                     'type' => $this->getField($aCardFromSet, 'type'),

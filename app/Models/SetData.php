@@ -26,7 +26,8 @@ class SetData extends Model
         'set_name',
         'official_set_code',
         'release_date',
-        'card_data_from_set_data_id',
-        'total_cards'
+        'total_cards',
+        'set_code',
+        'card_metadata_id'
     ];
 }

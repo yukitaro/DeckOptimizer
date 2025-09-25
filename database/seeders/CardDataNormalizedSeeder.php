@@ -31,6 +31,7 @@ class CardDataNormalizedSeeder extends Seeder
                 DB::raw('MIN(power) as power'),
                 DB::raw('MIN(toughness) as toughness'),
                 DB::raw('MIN(image_url) as image_url'),
+                DB::raw('MIN(printings) as printings'),
             ])
             ->get();
 
@@ -51,7 +52,8 @@ class CardDataNormalizedSeeder extends Seeder
                 'text' => $card->text,
                 'power' => $card->power,
                 'toughness' => $card->toughness,
-                'image_url_to_use' => $card->image_url
+                'image_url_to_use' => $card->image_url,
+                'printings' => $card->printings
             ]);
             //$aMagicSet = app\Models\MagicSetData;
             //$aMagicSet->set_name = $aParsedMagicSet->set_name;

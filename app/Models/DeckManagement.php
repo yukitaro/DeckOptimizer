@@ -46,5 +46,7 @@ class DeckManagement extends Model
         'description',
         'external_link',
         'num_cards',
+        'archetype',
+        'format'
     ];    
 }

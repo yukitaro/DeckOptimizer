@@ -33,7 +33,10 @@ class CardDataNormalized extends Model
         'rarity',
         'text',
         'power',
+        'set_code',
         'toughness',
-        'image_url_to_use'
+        'image_url_to_use',
+        'printings',
+        'source_printing_id'
     ];
 }

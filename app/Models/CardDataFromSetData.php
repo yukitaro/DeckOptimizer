@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 use App\Models\SetData;
 
@@ -16,7 +17,12 @@ class CardDataFromSetData extends Model
     public function setData()
     {
         return $this->belongsTo(SetData::class, 'magic_set_data_id');
-    }    
+    }
+
+    public function cardMetadata() : HasOne
+    {
+        return $this->hasOne(CardMetadata::class);
+    }
  
     /**
      * The attributes that are mass assignable.
@@ -35,9 +41,11 @@ class CardDataFromSetData extends Model
         'keywords',
         'mana_cost',
         'mana_value',
+        'card_metadata_id',
         'power',
         'printings',
         'rarity',
+        'set_code',
         'text',
         'toughness',
         'type',
