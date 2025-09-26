@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
@@ -13,9 +13,9 @@ class DeckManagement extends Model
 {
     protected $table = 'deck_management';
 
-    public function deckOwner() : BelongsTo
+    public function deckOwner() : HasOne
     {
-        return $this->belongsTo(DeckOwner::class);
+        return $this->hasOne(DeckOwner::class, 'deck_id');
     }
 
     public function cardsInDeck(): HasMany

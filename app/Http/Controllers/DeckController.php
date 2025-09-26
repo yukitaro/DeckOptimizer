@@ -61,6 +61,8 @@ class DeckController extends Controller
 
         $importedDeck->save();
 
+        $total_cards = 0;
+
         foreach ($cardLinesToParse as $cardLine) {
             $pattern = "/(\d){1,2}\s{1}(.*)/";
             preg_match($pattern, $cardLine, $matches);
@@ -85,6 +87,7 @@ class DeckController extends Controller
                 ];
             } else {
                 $cardCountInDeck += $matches[1];
+                $total_cards += $cardCountInDeck;
                 $matchesFound[] = $matchingCard->name;
                 $importedDeck->cardsInDeck()->create([
                     'card_name' => $matches[2],
@@ -95,6 +98,9 @@ class DeckController extends Controller
                 $importedDeck->save();
             }
         }
+
+        $importedDeck->num_cards = $total_cards;
+        $importedDeck->save();
 
         return response()->json([
             'status' => 'completed',
@@ -130,8 +136,19 @@ class DeckController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy($id)
     {
-        //
+        $deck = DeckManagement::findOrFail($id);
+
+        // Delete related cards
+        $deck->cardsInDeck()->delete();
+
+        // Delete owner record
+        $deck->deckOwner()->delete();
+
+        // Delete the deck itself
+        $deck->delete();
+
+        return response()->json(['message' => 'Deck deleted successfully']);
     }
 }

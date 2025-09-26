@@ -103,31 +103,54 @@ class FixBrokenImageUrls extends Command
         $this->info("Completed! Fixed: {$fixed}, Not found: {$notFound}");
     }
     
+
+    private function isThereACardBackRedirect(string $url) {
+        $client = new \GuzzleHttp\Client([
+            'allow_redirects' => [
+                'track_redirects' => true,
+                'max' => 10,
+            ],
+            'http_errors' => false,
+            'timeout' => 10,
+        ]);
+
+        $response = $client->get($url);
+        
+        $redirectChain = [];
+        
+        // Get the redirect history
+        if ($response->hasHeader('X-Guzzle-Redirect-History')) {
+            $redirectChain = $response->getHeader('X-Guzzle-Redirect-History');
+        }
+            
+        // Check if any URL in the redirect chain contains card_back
+        foreach ($redirectChain as $redirectUrl) {
+            if (str_contains($redirectUrl, 'card_back')) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     /**
      * Find an alternative image URL for the card
      */
     private function findAlternativeImageUrl(string $cardName, string $currentUrl): ?string
     {
-        // Try to find alternative printings with non-Gatherer URLs first
-        $alternativePrinting = CardDataFromSetData::where('name', $cardName)
-            ->whereNotNull('image_url')
-            ->where('image_url', '!=', $currentUrl)
-            ->where('image_url', 'NOT LIKE', '%gatherer.wizards.com%')
-            ->first();
-            
-        if ($alternativePrinting) {
-            return $alternativePrinting->image_url;
-        }
         
-        // If no non-Gatherer URLs, try other Gatherer URLs
-        $gathererAlternative = CardDataFromSetData::where('name', $cardName)
+        $gathererAlternatives = CardDataFromSetData::where('name', $cardName)
             ->whereNotNull('image_url')
             ->where('image_url', '!=', $currentUrl)
             ->where('image_url', 'LIKE', '%gatherer.wizards.com%')
-            ->first();
+            ->get();
             
-        if ($gathererAlternative) {
-            return $gathererAlternative->image_url;
+        if ($gathererAlternatives) {
+
+            foreach ($gathererAlternatives as $alternative) {
+                if (!$this->isThereACardBackRedirect($alternative->image_url)) {
+                    return $alternative->image_url;
+                }
+            }
         }
         
         return null;

@@ -46,6 +46,8 @@ Route::get('/decks', function () {
         ->get();
 });
 
+Route::delete('/decks/{id}', [DeckController::class, 'destroy']);
+
 Route::post('/test-image-url', function (Request $request) {
     $url = $request->input('url');
     $cardName = $request->input('card_name');
