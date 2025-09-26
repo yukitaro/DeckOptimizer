@@ -23,7 +23,7 @@ class CorsMiddleware
         }
 
         // Allow multiple origins for development
-        $allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'];
+        $allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:5173'];
         $origin = $request->headers->get('Origin');
         
         if (in_array($origin, $allowedOrigins)) {
