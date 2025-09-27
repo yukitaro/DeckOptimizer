@@ -2,8 +2,10 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\DeckController;
+
+use App\Http\Controllers\CollectedCardsImportController;
 use App\Models\CardsInDeck;
+use App\Models\Collections;
 use App\Models\DeckManagement;
 
 Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
@@ -164,3 +166,26 @@ Route::post('/report-broken-images', function (Request $request) {
         'count' => count($brokenUrls)
     ]);
 });
+
+Route::post('/collections/create', function (Request $request) {
+    $name = $request->input('name');
+    $description = $request->input('description', '');
+    
+    if (!$name) {
+        return response()->json(['error' => 'Collection name is required'], 400);
+    }
+    
+    $collection = new \App\Models\Collections();
+    $collection->name = $name;
+    $collection->description = $description;
+    $collection->owner_id = 1;
+    $collection->save();
+    
+    return response()->json([
+        'message' => 'Collection created successfully',
+        'collection' => $collection
+    ]);
+});
+
+Route::post('/collections/import-csv', [CollectedCardsImportController::class, 'import']);
+

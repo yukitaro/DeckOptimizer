@@ -4,9 +4,11 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CardDataController;
 use App\Http\Controllers\DeckController;
+
 use App\Models\CardData;
 use App\Models\CardDataFromSetData;
 use App\Models\CardsInDeck;
+use App\Models\Collections;
 use App\Models\DeckManagement;
 use App\Models\SetData;
 
@@ -131,6 +133,10 @@ Route::get('/decks', function () {
 
     return DeckManagement::limit($limit)
         ->get();
+});
+
+Route::get('/collections', function () {
+    return Collections::get();
 });
 
 use Illuminate\Http\Request;

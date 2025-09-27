@@ -6,14 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class DeckOwner extends Model
+class CollectionOwner extends Model
 {
-    protected $table = 'deck_owner';
+    protected $table = 'collection_owner';
 
-    public function ownedDecks(): HasMany
+    public function ownedCollections(): HasMany
     {
-        // trying out the ability to define the foreign key name as a param
-        return $this->hasMany(DeckManagement::class, 'deck_owner_id');
+        return $this->hasMany(CollectionManagement::class, 'owner_id');
     }
 
     /**
@@ -24,6 +23,6 @@ class DeckOwner extends Model
     protected $fillable = [
         'owner_login',
         'free_text',
-        'deck_id',
-    ];    
+        'collection_id',
+    ];
 }
