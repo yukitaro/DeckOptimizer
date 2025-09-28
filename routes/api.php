@@ -4,9 +4,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CollectedCardsImportController;
+use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
+use App\Models\CollectedCardsFromSets;
 use App\Models\Collections;
 use App\Models\DeckManagement;
+use App\Models\SetsInCollection;
 
 Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
     $deck = DeckManagement::findOrFail($deck_id);
@@ -189,3 +192,98 @@ Route::post('/collections/create', function (Request $request) {
 
 Route::post('/collections/import-csv', [CollectedCardsImportController::class, 'import']);
 
+Route::get('/collections/{collection_id}/cards', function (Request $request, $collection_id) {
+    $collection = Collections::with('setsInCollection.collectedCards.cardFromSet')->find($collection_id);
+
+    if (!$collection) {
+        return response()->json(['error' => 'Collection not found'], 404);
+    }
+
+    // Get all set_in_collection IDs for this collection
+    $setIds = $collection->setsInCollection()->pluck('id');
+
+    $query = CollectedCardsFromSets::with('cardFromSet')
+    ->whereIn('set_in_collection_id', $setIds)
+    ->with('cardFromSet');
+
+    // 🔍 Filter by name
+    if ($request->filled('search')) {
+        $query->whereHas('cardFromSet', function ($q) use ($request) {
+            $q->where('name', 'like', '%' . $request->search . '%');
+        });
+    }
+
+    // 🔀 Sort by name (requires join)
+    if ($request->sort === 'name') {
+        $query = CollectedCardsFromSets::query()
+            ->join('card_data_from_set_data', 'collected_cards.card_data_id', '=', 'card_data_from_set_data.id')
+            ->select('collected_cards.*')
+            ->whereIn('collected_cards.set_in_collection_id', $setIds)
+            ->orderBy('card_data_from_set_data.name')
+            ->with('cardFromSet');
+    }
+
+    // 🎯 Filter by set codes
+    if ($request->filled('sets')) {
+        $setCodes = explode(',', $request->sets);
+        $query->whereHas('cardFromSet', function ($q) use ($setCodes) {
+            $q->whereIn('set_code', $setCodes);
+        });
+    }
+
+    // 🧪 Filter by rarity
+    if ($request->filled('rarities')) {
+        $rarities = explode(',', $request->rarities);
+        $query->whereHas('cardFromSet', function ($q) use ($rarities) {
+            $q->whereIn('rarity', $rarities);
+        });
+    }
+
+    // 🎨 Filter by color identity
+    if ($request->filled('colors')) {
+        $colors = explode(',', $request->colors);
+        $query->whereHas('cardFromSet', function ($q) use ($colors) {
+            foreach ($colors as $color) {
+                $q->orWhereJsonContains('colors', $color);
+            }
+        });
+    }
+
+    // 📦 Pagination
+    $cards = $query->paginate(100);
+
+    return response()->json($cards);
+});
+
+Route::post('/inventory/lookup-normalized', function (Request $request) {
+    $names = $request->input('card_names', []);
+    $collectionIds = $request->input('collection_ids', []);
+    
+    \Log::info('Incoming names: ' . json_encode($names));
+    \Log::info('Collection IDs: ' . json_encode($collectionIds));
+
+    // Skip CardDataNormalized entirely and go straight to the source
+    $setIds = SetsInCollection::whereIn('collection_id', $collectionIds)->pluck('id');
+    \Log::info('Set IDs: ' . json_encode($setIds->toArray()));
+
+    // Find cards directly by name in the cardFromSet relationship
+    $cards = CollectedCardsFromSets::whereIn('set_in_collection_id', $setIds)
+        ->whereHas('cardFromSet', function ($q) use ($names) {
+            $q->whereIn('name', $names);
+        })
+        ->with('cardFromSet')
+        ->get();
+
+    \Log::info('Found cards count: ' . $cards->count());
+
+    // Group by the actual card name from the cardFromSet relationship
+    $grouped = $cards->groupBy(fn($card) => $card->cardFromSet->name)
+        ->map(fn($group, $name) => [
+            'name' => $name,
+            'total_count' => $group->sum('card_count'),
+            'variants' => $group
+        ]);
+
+    \Log::info('Grouped results: ' . json_encode($grouped->keys()));
+    return response()->json($grouped->values());
+});

@@ -4,8 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 use App\Models\SetData;
+use App\Models\CollectedCardsFromSets;
 
 class CardDataFromSetData extends Model
 {
@@ -23,6 +25,12 @@ class CardDataFromSetData extends Model
     {
         return $this->hasOne(CardMetadata::class);
     }
+
+    public function collectedCards()
+    {
+        return $this->hasMany(CollectedCardsFromSets::class, 'card_data_id');
+    }
+
  
     /**
      * The attributes that are mass assignable.

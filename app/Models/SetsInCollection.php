@@ -3,6 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+use App\Models\Collections;
+use App\Models\CollectedCardsFromSets;
+use App\Models\SetData;
 
 class SetsInCollection extends Model
 {
@@ -10,7 +16,7 @@ class SetsInCollection extends Model
 
     public function collection() : BelongsTo
     {
-        return $this->belongsTo(Collections::class, 'sets_in_collection_id');
+        return $this->belongsTo(Collections::class, 'collection_id');
     }
 
     public function magicSet() : BelongsTo
@@ -20,7 +26,7 @@ class SetsInCollection extends Model
 
     public function collectedCards() : HasMany
     {
-        return $this->hasMany(CollectedCardsFromSet::class, 'collected_cards_from_sets_id');
+        return $this->hasMany(CollectedCardsFromSets::class, 'set_in_collection_id');
     }
     
     /**

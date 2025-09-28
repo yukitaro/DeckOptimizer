@@ -9,7 +9,7 @@ class Collections extends Model
 {
     public function setsInCollection()
     {
-        return $this->hasMany(SetsInCollection::class);
+        return $this->hasMany(SetsInCollection::class, 'collection_id');
     }
 
     public $fillable = [
