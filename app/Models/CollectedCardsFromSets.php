@@ -28,10 +28,5 @@ class CollectedCardsFromSets extends Model
         'card_count',
         'set_in_collection_id',
         'card_data_id',
-        'is_foil',
-        'condition',
-        'printing_variant',
-        'purchase_price',
-        'storage_location'
     ];
 }

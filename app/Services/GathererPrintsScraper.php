@@ -5,8 +5,10 @@ namespace App\Services;
 use Illuminate\Support\Str;
 use Symfony\Component\DomCrawler\Crawler;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 use App\Utilities\MtgStringUtilities;
+use App\Models\CardDataFromSetData;
 
 class GathererPrintsScraper
 {
@@ -23,51 +25,48 @@ class GathererPrintsScraper
         $crawler = new Crawler($response->body());
         $cards = [];
 
-        $crawler->filter('div[data-testid="imageListCard"]')->each(function (Crawler $node) use (&$cards) {
-            $cardName = $node->filter('section p')->text('');
-            $imageTag = $node->filter('img')->first();
-
-            $imageUrl = null;
-            $backImage = null;
-            $hasFrontAndBack = $node->filter('[data-testid="cardFrontImage"]')->count() && $node->filter('[data-testid="cardBackImage"]')->count();
-
-            if ($hasFrontAndBack) {
-                $imageUrl = $crawler->filter('[data-testid="cardFrontImage"]')->attr('src') ?? null;
-                $backImage = $crawler->filter('[data-testid="cardBackImage"]')->attr('src') ?? null;
-            } else {
+        $crawler->filter('div[data-testid="imageListCard"]')->each(function (Crawler $node, $i) use (&$cards) {
+            try {
+                $imageTag = $node->filter('div[data-testid="cardPreviewImage"] img')->first();
                 $imageUrl = $imageTag->attr('src') ?? null;
+                $imageHash = basename(parse_url($imageUrl, PHP_URL_PATH), '.webp');
+                $title = $imageTag->attr('title') ?? '';
+
+                [$nameFromTitle, $setName] = explode(',', $title . ',', 2);
+                $cardName = trim($nameFromTitle);
+                $setName = trim($setName);
+
+                $href = $node->filter('a')->attr('href'); // e.g. /STA/en-us/47/urzas-rage
+                $segments = explode('/', $href);
+                $setCode = $segments[1] ?? '';
+                $cardNumber = $segments[2] ?? '';
+
+                $imageHash = basename(parse_url($imageUrl, PHP_URL_PATH), '.webp');
+                Log::debug("Image hash for {$cardName} ({$setCode})", ['hash' => $imageHash]);
+
+                Log::debug("Extracted: cardName='{$cardName}', setCode='{$setCode}', setName='{$setName}', title='{$title}'");
+
+                // Resolve UUID from local DB
+                $uuid = CardDataFromSetData::where('name', $cardName)
+                    ->where('set_name', $setCode)
+                    ->value('card_uuid');
+
+                if ($uuid) {
+                    $cards[] = [
+                        'card_name' => $cardName,
+                        'set_code' => $setCode,
+                        'set_name' => $setName,
+                        'card_number' => $cardNumber,
+                        'card_uuid' => $uuid,
+                        'image_hash' => $imageHash,
+                        'image_url' => $imageUrl,
+                    ];
+                }
+            } catch (\Exception $e) {
+                // Skip broken nodes
             }
-            
-            $imageHash = basename($imageUrl, '.webp');
-            $title = $imageTag->attr('title'); // e.g. "Urza's Rage, Strixhaven Mystical Archive"
-
-            [$nameFromTitle, $setName] = explode(',', $title . ',', 2);
-            $setName = trim($setName);
-            $setCode = $this->extractSetCodeFromUrl($node);
-
-
-            $cardNumber = $node->filter('div[data-testid="imageListInfo"] span')->text('');
-            $setSymbolUrl = $node->filter('div[data-testid="imageListInfo"] img')->attr('src');
-
-            $cards[] = [
-                'card_name' => $cardName,
-                'set_code' => $setCode,
-                'set_name' => $setName,
-                'card_number' => trim($cardNumber, '# '),
-                'image_hash' => $imageHash,
-                'image_url' => $imageUrl,
-                'back_image_url' => $backImage ?? null,
-                'set_symbol_url' => $setSymbolUrl,
-            ];
         });
 
         return $cards;
-    }
-
-    private function extractSetCodeFromUrl(Crawler $node): string
-    {
-        $href = $node->filter('a')->attr('href'); // e.g. /STA/en-us/47/urzas-rage
-        $segments = explode('/', $href);
-        return $segments[1] ?? '';
     }
 }

@@ -12,7 +12,7 @@ class CollectedCardService {
                 static::merge($attributes);
                 break;
             case 'set':
-                static::set($records);
+                static::set($attributes);
                 break;
             default:
                 throw new \InvalidArgumentException("Unsupported import mode: {$mode}");
@@ -47,4 +47,25 @@ class CollectedCardService {
             CollectedCardsFromSets::create($attributes);
         }
     }
+
+    protected static function set(array $attributes) {
+        // Normalize nullable fields
+        $attributes['condition'] = $attributes['condition'] ?: null;
+        $attributes['printing_variant'] = $attributes['printing_variant'] ?: null;
+        $attributes['purchase_price'] = $attributes['purchase_price'] ?: null;
+        $attributes['storage_location'] = $attributes['storage_location'] ?: null;
+
+        // For 'set' mode, just create/update without merging counts
+        CollectedCardsFromSets::updateOrCreate([
+            'set_in_collection_id' => $attributes['set_in_collection_id'],
+            'card_data_id' => $attributes['card_data_id'],
+            'condition' => $attributes['condition'],
+            'printing_variant' => $attributes['printing_variant'],
+            'is_foil' => $attributes['is_foil'],
+            'storage_location' => $attributes['storage_location'],
+        ], [
+            'card_count' => $attributes['card_count'],
+            'purchase_price' => $attributes['purchase_price'],
+        ]);
+    }    
 }

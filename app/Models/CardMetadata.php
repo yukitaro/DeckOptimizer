@@ -11,8 +11,12 @@ class CardMetadata extends Model
 {
     public function cardData() : BelongsTo
     {
-        return $this->belongsTo(CardDataFromSetData::class);
+        return $this->belongsTo(CardDataFromSetData::class, 'card_data_from_set_data_id');
     }
+
+    protected $casts = [
+        'normalized_attributes' => 'array',
+    ];
 
     protected $fillable = [
         'cardKingdomId',

@@ -4,6 +4,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CollectedCardsImportController;
+
+use App\Builders\CollectionCardQueryBuilder;
+
 use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
 use App\Models\CollectedCardsFromSets;
@@ -200,59 +203,38 @@ Route::get('/collections/{collection_id}/cards', function (Request $request, $co
     }
 
     // Get all set_in_collection IDs for this collection
-    $setIds = $collection->setsInCollection()->pluck('id');
+    $setIds = $collection->setsInCollection()->pluck('id')->toArray();
+    $builder = new CollectionCardQueryBuilder($request, $setIds);
+    $query = $builder->getQuery();
 
-    $query = CollectedCardsFromSets::with('cardFromSet')
-    ->whereIn('set_in_collection_id', $setIds)
-    ->with('cardFromSet');
+    $totalMatchingCount = $query->count();
 
-    // 🔍 Filter by name
-    if ($request->filled('search')) {
-        $query->whereHas('cardFromSet', function ($q) use ($request) {
-            $q->where('name', 'like', '%' . $request->search . '%');
-        });
+    if ($totalMatchingCount <= 100) {
+        $cards = $query->get();
+        return response()->json([
+            'data' => $cards,
+            'meta' => [
+                'current_page' => 1,
+                'last_page' => 1,
+                'total_matching_count' => $totalMatchingCount,
+                'is_complete' => true
+            ]
+        ]);
+    } else {
+    
+        // 📦 Pagination
+        $cards = $query->paginate(100);
+
+        return response()->json([
+            'data' => $cards->items(),
+            'meta' => [
+                'current_page' => $cards->currentPage(),
+                'last_page' => $cards->lastPage(),
+                'total_matching_count' => $cards->total(),
+                'is_complete' => false
+            ]
+        ]);
     }
-
-    // 🔀 Sort by name (requires join)
-    if ($request->sort === 'name') {
-        $query = CollectedCardsFromSets::query()
-            ->join('card_data_from_set_data', 'collected_cards.card_data_id', '=', 'card_data_from_set_data.id')
-            ->select('collected_cards.*')
-            ->whereIn('collected_cards.set_in_collection_id', $setIds)
-            ->orderBy('card_data_from_set_data.name')
-            ->with('cardFromSet');
-    }
-
-    // 🎯 Filter by set codes
-    if ($request->filled('sets')) {
-        $setCodes = explode(',', $request->sets);
-        $query->whereHas('cardFromSet', function ($q) use ($setCodes) {
-            $q->whereIn('set_code', $setCodes);
-        });
-    }
-
-    // 🧪 Filter by rarity
-    if ($request->filled('rarities')) {
-        $rarities = explode(',', $request->rarities);
-        $query->whereHas('cardFromSet', function ($q) use ($rarities) {
-            $q->whereIn('rarity', $rarities);
-        });
-    }
-
-    // 🎨 Filter by color identity
-    if ($request->filled('colors')) {
-        $colors = explode(',', $request->colors);
-        $query->whereHas('cardFromSet', function ($q) use ($colors) {
-            foreach ($colors as $color) {
-                $q->orWhereJsonContains('colors', $color);
-            }
-        });
-    }
-
-    // 📦 Pagination
-    $cards = $query->paginate(100);
-
-    return response()->json($cards);
 });
 
 Route::post('/inventory/lookup-normalized', function (Request $request) {
