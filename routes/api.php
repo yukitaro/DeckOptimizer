@@ -4,6 +4,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CollectedCardsImportController;
+use App\Http\Controllers\MtgCardPriceController;
+use App\Http\Controllers\DeckController;
 
 use App\Builders\CollectionCardQueryBuilder;
 
@@ -13,6 +15,7 @@ use App\Models\CollectedCardsFromSets;
 use App\Models\Collections;
 use App\Models\DeckManagement;
 use App\Models\SetsInCollection;
+use App\Models\MtgImageLookup;
 
 Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
     $deck = DeckManagement::findOrFail($deck_id);
@@ -30,12 +33,44 @@ Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
 
     // Step 4: Attach card_count to each normalized card
     $enriched = $normalizedCards->map(function ($card) use ($countMap) {
+        $sourceCard = $card->sourceCard;
+         if (!$sourceCard) {
+             \Log::warning("No sourceCard for normalized ID {$card->id}");
+             return null;
+         }
+ 
+         $meta = $sourceCard->cardMetadata;
+         if (!$meta) {
+             \Log::warning("No cardMetadata for sourceCard ID {$sourceCard->id}");
+             return null;
+         }
+ 
+         $set = $sourceCard->setData;
+         if (!$set) {
+             \Log::warning("No setData for sourceCard ID {$sourceCard->id}");
+             return null;
+         }
+ 
+         \Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
+         if (!$meta || !$set) return null;
+ 
+         $card->name = $meta->name;
+         $card->type = $meta->type;
+         $card->mana_cost = $meta->mana_cost;
+
+        $imageLookup = MtgImageLookup::where('card_uuid', $sourceCard->card_uuid)->first();
+        $imageUrl = $imageLookup->canonical_image_url
+            ?? $meta->image_url_to_use
+            ?? $card->image_url_to_use; // fallback to existing
+
         return [
             'id' => $card->id,
-            'name' => $card->name,
-            'type' => $card->type,
-            'mana_cost' => $card->mana_cost,
-            'image_url_to_use' => $card->image_url_to_use,
+            'image_url_to_use' => $imageUrl,
+            'has_mana_cost' => !is_null($sourceCard->mana_cost),
+            'name' => $sourceCard->name, //$card->name,
+            'normalized_name' => $card->normalized_name,
+            'scryfall_id' => $meta->scryfallId ?? null,
+            'type' => $sourceCard->type, //$card->type,
             'card_count' => $countMap[$card->id] ?? 0
         ];
     });
@@ -196,45 +231,31 @@ Route::post('/collections/create', function (Request $request) {
 Route::post('/collections/import-csv', [CollectedCardsImportController::class, 'import']);
 
 Route::get('/collections/{collection_id}/cards', function (Request $request, $collection_id) {
-    $collection = Collections::with('setsInCollection.collectedCards.cardFromSet')->find($collection_id);
+    $collection = Collections::find($collection_id);
 
     if (!$collection) {
         return response()->json(['error' => 'Collection not found'], 404);
     }
 
-    // Get all set_in_collection IDs for this collection
     $setIds = $collection->setsInCollection()->pluck('id')->toArray();
+
     $builder = new CollectionCardQueryBuilder($request, $setIds);
     $query = $builder->getQuery();
 
-    $totalMatchingCount = $query->count();
+    $perPage = min(max((int) $request->get('per_page', 100), 1), 250);
+    $page = max(1, (int) $request->get('page', 1));
 
-    if ($totalMatchingCount <= 100) {
-        $cards = $query->get();
-        return response()->json([
-            'data' => $cards,
-            'meta' => [
-                'current_page' => 1,
-                'last_page' => 1,
-                'total_matching_count' => $totalMatchingCount,
-                'is_complete' => true
-            ]
-        ]);
-    } else {
-    
-        // 📦 Pagination
-        $cards = $query->paginate(100);
+    $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
-        return response()->json([
-            'data' => $cards->items(),
-            'meta' => [
-                'current_page' => $cards->currentPage(),
-                'last_page' => $cards->lastPage(),
-                'total_matching_count' => $cards->total(),
-                'is_complete' => false
-            ]
-        ]);
-    }
+    return response()->json([
+        'data' => $paginator->items(),
+        'meta' => [
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'total_matching_count' => $paginator->total(),
+            'is_complete' => $paginator->lastPage() === 1
+        ]
+    ]);
 });
 
 Route::post('/inventory/lookup-normalized', function (Request $request) {
@@ -269,3 +290,5 @@ Route::post('/inventory/lookup-normalized', function (Request $request) {
     \Log::info('Grouped results: ' . json_encode($grouped->keys()));
     return response()->json($grouped->values());
 });
+
+Route::post('/fetch-card-prices', [MtgCardPriceController::class, 'fetchPrices']);

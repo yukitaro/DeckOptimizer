@@ -11,68 +11,107 @@ class CollectionCardQueryBuilder
 {
     protected Builder $query;
 
+    public function getQuery(): Builder
+    {
+        return $this->query;
+    }
+
     public function __construct(Request $request, array $setIds)
     {
-        $matchingCardIds = [];
-
-        if ($request->filled('search')) {
-            $matchingCardIds = CardDataFromSetData::query()
-                ->where('name', 'like', '%' . $request->search . '%')
-                ->pluck('id')
-                ->toArray();
-        }
-
         $this->query = CollectedCardsFromSets::query()
             ->whereIn('set_in_collection_id', $setIds)
             ->with('cardFromSet');
 
-        if (!empty($matchingCardIds)) {
-            $this->query->whereIn('card_data_id', $matchingCardIds);
-        }
-
+        $this->applySearch($request);
         $this->applyFilters($request);
         $this->applySorting($request);
     }
 
+    protected function applySearch(Request $request): void
+    {
+        $search = trim($request->input('filters.search', ''));
+        if ($search !== '') {
+            $matchingCardIds = CardDataFromSetData::query()
+                ->where('name', 'like', '%' . $search . '%')
+                ->pluck('id')
+                ->toArray();
+
+            $this->query->whereIn('card_data_id', $matchingCardIds ?: [-1]); // force empty if none
+        }
+    }    
+
     protected function applyFilters(Request $request): void
     {
-        if ($request->filled('sets')) {
-            $setCodes = explode(',', $request->sets);
-            $this->query->whereHas('cardFromSet', function ($q) use ($setCodes) {
-                $q->whereIn('set_code', $setCodes);
-            });
+        $filters = $request->input('filters', []);
+
+        if (!empty($filters['sets'])) {
+            $setCodes = array_filter(explode(',', $filters['sets']));
+            $this->query->whereHas('cardFromSet', fn($q) => $q->whereIn('set_code', $setCodes));
         }
 
-        if ($request->filled('colors')) {
-            $colors = explode(',', $request->colors);
+        if (!empty($filters['colors'])) {
+            $colors = array_filter(explode(',', $filters['colors']));
             $this->query->whereHas('cardFromSet', function ($q) use ($colors) {
-                foreach ($colors as $color) {
-                    $q->orWhereJsonContains('colors', $color);
-                }
+                $q->where(function ($inner) use ($colors) {
+                    foreach ($colors as $color) {
+                        $inner->orWhereJsonContains('colors', $color);
+                    }
+                });
             });
         }
 
-        if ($request->filled('rarities')) {
-            $rarities = explode(',', $request->rarities);
-            $this->query->whereHas('cardFromSet', function ($q) use ($rarities) {
-                $q->whereIn('rarity', $rarities);
-            });
+        if (!empty($filters['rarities'])) {
+            $rarities = array_filter(explode(',', $filters['rarities']));
+            $this->query->whereHas('cardFromSet', fn($q) => $q->whereIn('rarity', $rarities));
         }
     }
 
     protected function applySorting(Request $request): void
     {
-        if ($request->sort === 'name') {
-            // Sort after retrieval or use a join if needed
-            $this->query->orderBy('card_data_id'); // fallback sort
-        } else {
-            // Default sort by card count descending
-            $this->query->orderBy('card_count', 'desc');
+        [$sort, $direction] = $this->normalizeSort($request);
+
+        switch ($sort) {
+            case 'name':
+                // Join for ordering by related name field
+                $this->query
+                    ->join('card_data_from_set_data as cfs', 'collected_cards.card_data_id', '=', 'cfs.id')
+                    ->select('collected_cards.*')
+                    ->orderBy('cfs.name', $direction)
+                    ->orderBy('collected_cards.id');
+                break;
+
+            case 'count':
+                $this->query
+                    ->orderBy('card_count', $direction)
+                    ->orderBy('card_data_id');
+                break;
+
+            case 'set':
+                $this->query
+                    ->join('card_data_from_set_data as cfs_set', 'collected_cards_from_sets.card_data_id', '=', 'cfs_set.id')
+                    ->select('collected_cards_from_sets.*')
+                    ->orderBy('cfs_set.set_code', $direction)
+                    ->orderBy('cfs_set.name')
+                    ->orderBy('collected_cards_from_sets.id');
+                break;
+
+            default:
+                // Fallback deterministic order
+                $this->query
+                    ->orderBy('card_count', 'desc')
+                    ->orderBy('card_data_id');
         }
     }
 
-    public function getQuery(): Builder
-    {
-        return $this->query;
+    protected function normalizeSort(Request $request): array {
+        $validKeys = ['name', 'count', 'set', 'rarity'];
+
+        $key = $request->input('sort.key');
+        $direction = strtolower($request->input('sort.direction'));
+
+        $key = in_array($key, $validKeys) ? $key : 'count';
+        $direction = in_array($direction, ['asc', 'desc']) ? $direction : 'desc';
+
+        return [$key, $direction];
     }
 }

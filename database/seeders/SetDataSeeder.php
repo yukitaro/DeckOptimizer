@@ -32,6 +32,8 @@ class SetDataSeeder extends Seeder
 
         $jsonSetData = glob($jsonDataPath . '/*.json'); 
 
+        $normalizedSeen = [];        
+
         foreach ($jsonSetData as $aSetData) {
             if (is_file($aSetData)) {
                 $jsonPointerToSetData = JsonParser::parse($aSetData)->pointer('/data');
@@ -54,7 +56,7 @@ class SetDataSeeder extends Seeder
                         $existingSet->save();
                     }
 
-                    if ($existingSet->cards_populated) {
+                    if (!$existingSet->cards_populated) {  // Changed: NOT populated
                         $jsonCardData = JsonParser::parse($aSetData)->pointer('/data/cards');
 
                         foreach ($jsonCardData as $key => $aCardData) {
@@ -66,18 +68,9 @@ class SetDataSeeder extends Seeder
 
                                     $imageUrl = $multiverseId ? "https://gatherer.wizards.com/Handlers/Image.ashx?multiverseid=" . $multiverseId . "&type=card" : null;
 
-                                    $metadata = new CardMetadata([
-                                        'cardKingdomId' => $identifiers['cardKingdomId'] ?? null,
-                                        'multiverseId' => $multiverseId,
-                                        'scryfallId' => $identifiers['scryfallId'] ?? null,
-                                        'tcgplayerProductId' => $identifiers['tcgplayerProductId'] ?? null,
-                                        'tcgplayerPurchaseUrl' => $purchaseUrls['tcgplayer'] ?? null
-                                    ]);
+                                    $metadata = $this->findOrCreateMetadata($identifiers, $purchaseUrls, $aCardFromSet);
 
-                                    CardMetadataEnricher::enrich($aCardFromSet, $metadata);
-                                    $metadata->save();
-
-                                    $existingSet->cardsInSet()->create([
+                                    $cardRow = $existingSet->cardsInSet()->create([
                                         'name' => $this->getField($aCardFromSet, 'name'),
                                         'set_name' => $existingSet['set_name'],
                                         'magic_set_data_id' => $existingSet->id,
@@ -93,44 +86,98 @@ class SetDataSeeder extends Seeder
                                         'power' => $this->getField($aCardFromSet, 'power'),
                                         'printings' => $this->getField($aCardFromSet, 'printings', true),
                                         'rarity' => $this->getField($aCardFromSet, 'rarity'),
-                                        'set_code' => $existingSet['setCode'],
                                         'text' => $this->getField($aCardFromSet, 'text'),
                                         'toughness' => $this->getField($aCardFromSet, 'toughness'),
                                         'type' => $this->getField($aCardFromSet, 'type'),
                                         'types' => $this->getField($aCardFromSet, 'types', true),
                                         'image_url' => $imageUrl,
                                     ]);
-                                }
-                            }
-                        }
-                        SetEnrichmentStatus::updateOrCreate(
-                            ['set_code' => $setCode],
-                            ['enriched_at' => now(), 'logic_version' => $logicVersion]
-                        );
-                    }
+                                    
+                                    $normalizedName = strtolower(trim($cardRow->name));
 
+                                    if (!isset($normalizedSeen[$normalizedName])) {
+                                        \App\Models\CardDataNormalized::updateOrCreate(
+                                            [
+                                                'normalized_name' => $normalizedName,
+                                                'set_code' => $existingSet->set_name,
+                                            ],
+                                            [
+                                                'source_printing_id' => $cardRow->id,
+                                                'source_printing' => $cardRow->number_in_set,
+                                                'printings' => $this->getField($aCardFromSet, 'printings', true),
+                                                'image_url_to_use' => $cardRow->image_url,
+                                            ]
+                                        );
 
-                    $status = SetEnrichmentStatus::where('set_code', $setCode)->first();
-
-                    // Enrich metadata even if cards already populated
-                    if (!$status || $status->logic_version !== $logicVersion) {
-                        foreach ($jsonCards as $group) {
-                            foreach ($group as $cardJson) {
-                                $metadata = CardMetadata::where('scryfallId', $cardJson['identifiers']['scryfallId'] ?? null)->first();
-                                if ($metadata) {
-                                    CardMetadataEnricher::enrich($cardJson, $metadata);
+                                        $normalizedSeen[$normalizedName] = true;
+                                    }
+                                    
+                                    // Complete the bidirectional link
+                                    $metadata->card_data_from_set_data_id = $cardRow->id;
                                     $metadata->save();
                                 }
                             }
                         }
 
+                        $existingSet->cards_populated = true;
+                        $existingSet->save();
+                        
                         SetEnrichmentStatus::updateOrCreate(
                             ['set_code' => $setCode],
                             ['enriched_at' => now(), 'logic_version' => $logicVersion]
                         );
                     }
+
+
                 }
             }        
         }
+    }
+
+    private function findOrCreateMetadata(array $identifiers, array $purchaseUrls, array $cardJson): CardMetadata
+    {
+        $scry = $identifiers['scryfallId'] ?? null;
+        $multi = $identifiers['multiverseId'] ?? null;
+        $tcg = $identifiers['tcgplayerProductId'] ?? null;
+
+        // Try to find existing metadata by identifiers
+        $query = CardMetadata::query();
+        if ($scry) {
+            $query->where('scryfallId', $scry);
+        } elseif ($multi) {
+            $query->where('multiverseId', $multi);
+        } elseif ($tcg) {
+            $query->where('tcgplayerProductId', $tcg);
+        }
+
+        $metadata = $query->first();
+        
+        if (!$metadata) {
+            $metadata = new CardMetadata();
+        }
+
+        // Direct assignment instead of using closure with reference
+        if ($scry !== null && $scry !== '') {
+            $metadata->scryfallId = $scry;
+        }
+        if ($multi !== null && $multi !== '') {
+            $metadata->multiverseId = $multi;
+        }
+        if (isset($identifiers['cardKingdomId']) && $identifiers['cardKingdomId'] !== '') {
+            $metadata->cardKingdomId = $identifiers['cardKingdomId'];
+        }
+        if ($tcg !== null && $tcg !== '') {
+            $metadata->tcgplayerProductId = $tcg;
+        }
+        if (isset($purchaseUrls['tcgplayer']) && $purchaseUrls['tcgplayer'] !== '') {
+            $metadata->tcgplayerPurchaseUrl = $purchaseUrls['tcgplayer'];
+        }
+
+        // Run enrichment
+        CardMetadataEnricher::enrich($cardJson, $metadata);
+
+        $metadata->save();
+
+        return $metadata;
     }
 }

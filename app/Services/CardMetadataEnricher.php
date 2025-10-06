@@ -20,6 +20,14 @@ class CardMetadataEnricher
             $metadata->hasNonFoil = in_array('nonfoil', $cardJson['finishes']);
         }
 
+        if (!empty($cardJson['identifiers'])) {
+            $metadata->identifiers = $cardJson['identifiers']; // if you have this JSON column
+        }
+
+        if (!empty($cardJson['purchaseUrls'])) {
+            $metadata->purchaseUrls = $cardJson['purchaseUrls']; // if you have this JSON column
+        }
+
         $metadata->normalized_attributes = $normalizedAttributes;
         $metadata->normalized_name = static::normalizeName($cardJson['name']);
         $metadata->borderColor = $cardJson['borderColor'] ?? '';

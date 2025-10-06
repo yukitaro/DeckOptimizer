@@ -36,7 +36,8 @@ class DeckController extends Controller
         $errors = [];
         $matchesFound = [];
         $index = 0;
-        $cardCountInDeck = 0;
+
+        $importedDeckSideboard = null;
 
         $cardLinesToParse = preg_split('/\R/', $request->input('deckData'));
 
@@ -46,7 +47,6 @@ class DeckController extends Controller
             ['owner_login' => $owner_login],
             ['free_text' => 'haha these are all mine', 'deck_id' => 1]
         );
-
         
         $owner_data->save();
        
@@ -61,13 +61,44 @@ class DeckController extends Controller
 
         $importedDeck->save();
 
+        $importedDeckMainboard = $importedDeck->boardGroups()->create([
+            'board_type' => 'main',
+            'label' => 'Main Deck'
+        ]);
+
+        $currentBoardGroup = $importedDeckMainboard;
+        $isSideboard = false;
+
+        $importedDeckMainboard->save();
+
         $total_cards = 0;
 
         foreach ($cardLinesToParse as $cardLine) {
-            $pattern = "/(\d){1,2}\s{1}(.*)/";
+            $pattern = "/(\d+)\s+(.*)/";
             preg_match($pattern, $cardLine, $matches);
 
             if (!isset($matches[2])) {
+                if (trim($cardLine) === '') {
+                    $index++;
+                    continue; // skip empty lines
+                }
+
+                if (stripos($cardLine, 'sideboard') !== false) {
+                    $index++;
+                    $isSideboard = true;
+
+                    $importedDeckMainboard->num_cards = $total_cards;
+                    $importedDeckMainboard->save();
+
+                    $currentBoardGroup = $importedDeck->boardGroups()->create([
+                        'board_type' => 'side',
+                        'label' => 'Sideboard'
+                    ]);
+
+                    $total_cards = 0;
+                    continue; // skip sideboard lines for now
+                }
+
                 $errors[] = [
                     'line' => $index + 1,
                     'input' => $cardLine,
@@ -76,7 +107,7 @@ class DeckController extends Controller
                 continue;
             }
 
-            $matchingCard = CardDataNormalized::where('name', $matches[2])
+            $matchingCard = CardDataNormalized::whereRaw('LOWER(TRIM(normalized_name)) = ?', [strtolower(trim($matches[2]))])
                 ->first();
 
             if (!$matchingCard) {
@@ -85,18 +116,21 @@ class DeckController extends Controller
                     'input' => $matches[2],
                     'error' => 'No matching card found for: ' . $matches[2]
                 ];
+                //Log::warning("Unresolved card during import: '{$matches[2]}' on line {$index + 1}");
             } else {
-                $cardCountInDeck += $matches[1];
-                $total_cards += $cardCountInDeck;
-                $matchesFound[] = $matchingCard->name;
-                $importedDeck->cardsInDeck()->create([
-                    'card_name' => $matches[2],
+                $total_cards += (int) $matches[1];
+                $matchesFound[] = $matchingCard->normalized_name;
+
+                $currentBoardGroup->cardsInGroup()->create([
+                    'card_name' => $matchingCard->normalized_name,
                     'card_count' => $matches[1],
-                    'image_url' => $matchingCard['image_url_to_use'],
-                    'card_data_normalized_id' => $matchingCard->id
+                    'image_url' => $matchingCard->image_url_to_use,
+                    'card_data_normalized_id' => $matchingCard->id,
+                    'deck_management_id' => $importedDeck->id,
                 ]);
-                $importedDeck->save();
             }
+
+            $index++;
         }
 
         $importedDeck->num_cards = $total_cards;

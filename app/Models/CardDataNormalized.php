@@ -21,26 +21,33 @@ class CardDataNormalized extends Model
      */
     protected $table = 'card_data_normalized';
 
-    public function sourcePrinting() : BelongsTo
+/*     public function normalized(): HasOne
+    {
+        return $this->hasOne(CardDataNormalized::class, 'source_printing_id');
+    } */
+
+    public function sourceCard(): BelongsTo
     {
         return $this->belongsTo(CardDataFromSetData::class, 'source_printing_id');
-    }    
+    }
 
+    public function metadata(): BelongsTo
+    {
+        return $this->belongsTo(CardMetadata::class, 'card_metadata_id');
+    }
+
+    public function set(): BelongsTo
+    {
+        return $this->belongsTo(SetData::class, 'magic_set_data_id');
+    }
     /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
      */
     protected $fillable = [
-        'name',
-        'type',
-        'colors',
-        'mana_cost',
-        'rarity',
-        'text',
-        'power',
+        'normalized_name',
         'set_code',
-        'toughness',
         'image_url_to_use',
         'printings',
         'source_printing_id'

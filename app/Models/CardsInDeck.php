@@ -20,6 +20,11 @@ class CardsInDeck extends Model
         return $this->belongsTo(CardDataNormalized::class, 'card_data_normalized_id');
     }
 
+    public function boardGroups(): BelongsTo
+    {
+        return $this->belongsTo(MtgDeckBoardGroup::class, 'id', 'mtg_deck_board_group_id');
+    }
+
     /**
      * The attributes that are mass assignable.
      *
@@ -30,6 +35,7 @@ class CardsInDeck extends Model
         'card_count',
         'image_url',
         'deck_management_id',
+        'mtg_deck_board_group_id',
         'card_data_normalized_id',
         'updated_at'
     ];    

@@ -23,6 +23,11 @@ class DeckManagement extends Model
         return $this->hasMany(CardsInDeck::class, 'deck_management_id');
     }
 
+    public function boardGroups(): HasMany
+    {
+        return $this->hasMany(MtgDeckBoardGroups::class, 'deck_id');
+    }
+
     public function normalizedCards(): HasManyThrough
     {
         return $this->hasManyThrough(
