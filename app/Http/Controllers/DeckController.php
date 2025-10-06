@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
@@ -36,7 +37,9 @@ class DeckController extends Controller
         $errors = [];
         $matchesFound = [];
         $index = 0;
-
+        $current_total_cards = 0;
+        $total_cards_mainboard = 0;
+        $total_cards_sideboard = 0;
         $importedDeckSideboard = null;
 
         $cardLinesToParse = preg_split('/\R/', $request->input('deckData'));
@@ -67,13 +70,10 @@ class DeckController extends Controller
         ]);
 
         $currentBoardGroup = $importedDeckMainboard;
-        $isSideboard = false;
-
         $importedDeckMainboard->save();
 
-        $total_cards = 0;
-
         foreach ($cardLinesToParse as $cardLine) {
+
             $pattern = "/(\d+)\s+(.*)/";
             preg_match($pattern, $cardLine, $matches);
 
@@ -85,9 +85,9 @@ class DeckController extends Controller
 
                 if (stripos($cardLine, 'sideboard') !== false) {
                     $index++;
-                    $isSideboard = true;
 
-                    $importedDeckMainboard->num_cards = $total_cards;
+                    $importedDeckMainboard->num_cards = $current_total_cards;
+                    $total_cards_mainboard = $current_total_cards;
                     $importedDeckMainboard->save();
 
                     $currentBoardGroup = $importedDeck->boardGroups()->create([
@@ -95,7 +95,9 @@ class DeckController extends Controller
                         'label' => 'Sideboard'
                     ]);
 
-                    $total_cards = 0;
+                    $importedDeckSideboard = $currentBoardGroup;
+
+                    $current_total_cards = 0;
                     continue; // skip sideboard lines for now
                 }
 
@@ -118,7 +120,7 @@ class DeckController extends Controller
                 ];
                 //Log::warning("Unresolved card during import: '{$matches[2]}' on line {$index + 1}");
             } else {
-                $total_cards += (int) $matches[1];
+                $current_total_cards += (int) $matches[1];
                 $matchesFound[] = $matchingCard->normalized_name;
 
                 $currentBoardGroup->cardsInGroup()->create([
@@ -133,7 +135,13 @@ class DeckController extends Controller
             $index++;
         }
 
-        $importedDeck->num_cards = $total_cards;
+        if ($importedDeckSideboard) {
+            $total_cards_sideboard = $current_total_cards;
+            $importedDeckSideboard->num_cards = $total_cards_sideboard;
+            $importedDeckSideboard->save();
+        }
+
+        $importedDeck->num_cards = $total_cards_mainboard + $total_cards_sideboard;
         $importedDeck->save();
 
         return response()->json([

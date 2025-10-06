@@ -19,7 +19,7 @@ class MtgDeckBoardGroups extends Model
 
     public function cardsInGroup() : HasMany
     {
-        return $this->hasMany(CardsInDeck::class, 'id', 'mtg_deck_board_group_id');
+        return $this->hasMany(CardsInDeck::class, 'mtg_deck_board_group_id');
     }
 
     protected $fillable = [

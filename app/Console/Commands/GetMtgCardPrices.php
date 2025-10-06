@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 
 class GetMtgCardPrices extends Command
 {
@@ -12,19 +13,13 @@ class GetMtgCardPrices extends Command
      * @var string
      */
     protected $signature = 'app:get-mtg-card-prices';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Command description';
+    protected $description = 'Fetch and store daily MTG card prices';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        //
+        
     }
 }

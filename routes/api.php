@@ -14,8 +14,9 @@ use App\Models\CardsInDeck;
 use App\Models\CollectedCardsFromSets;
 use App\Models\Collections;
 use App\Models\DeckManagement;
-use App\Models\SetsInCollection;
 use App\Models\MtgImageLookup;
+use App\Models\MtgDeckBoardGroups;
+use App\Models\SetsInCollection;
 
 Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
     $deck = DeckManagement::findOrFail($deck_id);
@@ -79,6 +80,72 @@ Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
 });
 // ->middleware('auth:sanctum');
 
+Route::get('/sideboard/{deck_id}', function ($deck_id) {
+    $sideboardGroup = MtgDeckBoardGroups::where('deck_id', $deck_id)
+        ->where('board_type', 'side')
+        ->first();
+
+    if (!$sideboardGroup) {
+        return response()->json([]);
+    }
+
+    $cardsInSideboard = $sideboardGroup->cardsInGroup;
+
+    // Step 2: Build a map of card_data_normalized_id → card_count
+    $countMap = $cardsInSideboard->groupBy('card_data_normalized_id')->map(function ($group) {
+        return $group->sum('card_count');
+    });
+
+    // Step 3: Get normalized cards via hasManyThrough
+    $normalizedIds = $cardsInSideboard->pluck('card_data_normalized_id')->unique();
+    $normalizedCards = CardDataNormalized::whereIn('id', $normalizedIds)->get();
+
+    // Step 4: Attach card_count to each normalized card
+    $enriched = $normalizedCards->map(function ($card) use ($countMap) {
+        $sourceCard = $card->sourceCard;
+         if (!$sourceCard) {
+             \Log::warning("No sourceCard for normalized ID {$card->id}");
+             return null;
+         }
+ 
+         $meta = $sourceCard->cardMetadata;
+         if (!$meta) {
+             \Log::warning("No cardMetadata for sourceCard ID {$sourceCard->id}");
+             return null;
+         }
+ 
+         $set = $sourceCard->setData;
+         if (!$set) {
+             \Log::warning("No setData for sourceCard ID {$sourceCard->id}");
+             return null;
+         }
+ 
+         \Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
+         if (!$meta || !$set) return null;
+ 
+         $card->name = $meta->name;
+         $card->type = $meta->type;
+         $card->mana_cost = $meta->mana_cost;
+
+        $imageLookup = MtgImageLookup::where('card_uuid', $sourceCard->card_uuid)->first();
+        $imageUrl = $imageLookup->canonical_image_url
+            ?? $meta->image_url_to_use
+            ?? $card->image_url_to_use; // fallback to existing
+
+        return [
+            'id' => $card->id,
+            'image_url_to_use' => $imageUrl,
+            'has_mana_cost' => !is_null($sourceCard->mana_cost),
+            'name' => $sourceCard->name, //$card->name,
+            'normalized_name' => $card->normalized_name,
+            'scryfall_id' => $meta->scryfallId ?? null,
+            'type' => $sourceCard->type, //$card->type,
+            'card_count' => $countMap[$card->id] ?? 0
+        ];
+    });
+
+    return response()->json($enriched);
+});
 
 Route::post('/deck', [DeckController::class, 'store']);
 
