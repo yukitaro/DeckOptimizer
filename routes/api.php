@@ -4,7 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CollectedCardsImportController;
-use App\Http\Controllers\MtgCardPriceController;
+use App\Http\Controllers\MtgBulkPriceController;
 use App\Http\Controllers\DeckController;
 
 use App\Builders\CollectionCardQueryBuilder;
@@ -358,4 +358,4 @@ Route::post('/inventory/lookup-normalized', function (Request $request) {
     return response()->json($grouped->values());
 });
 
-Route::post('/fetch-card-prices', [MtgCardPriceController::class, 'fetchPrices']);
+Route::post('/fetch-card-prices', [MtgBulkPriceController::class, 'fetchPrices']);
