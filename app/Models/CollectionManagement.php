@@ -17,23 +17,23 @@ class CollectionManagement extends Model
 
     public function collectionOwner() : HasOne
     {
-        return $this->hasOne(CollectionOwner::class, 'collection_id');
+        return $this->hasOne(CollectionOwner::class, 'collection_management_id');
     }
 
     public function setsInCollection() : HasMany
     {
-        return $this->hasMany(SetsInCollection::class, 'collection_id');
+        return $this->hasMany(SetsInCollection::class, 'collection_management_id');
     }
 
-    public function cardsInCollection() : HasManyThrough
+    public function cardsInCollection(): HasManyThrough
     {
         return $this->hasManyThrough(
             CollectedCardsFromSets::class,     // Final model
-            SetsInCollection::class,      // Intermediate model
-            'collection_id',              // Foreign key on SetsInCollection
-            'id',                         // Foreign key on CardsInCollection
-            'id',                         // Local key on CollectionManagement
-            'sets_in_collections_id'      // Local key on SetsInCollection
+            SetsInCollection::class,           // Intermediate model
+            'collection_management_id',        // Foreign key on SetsInCollection
+            'set_in_collection_id',            // Foreign key on CollectedCardsFromSets
+            'id',                              // Local key on CollectionManagement
+            'id'                               // Local key on SetsInCollection
         );
     }
 
@@ -41,6 +41,5 @@ class CollectionManagement extends Model
         'owner_id',
         'collection_name',
         'description',
-        'sets_in_collection_id'
     ];
 }

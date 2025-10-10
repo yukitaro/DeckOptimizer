@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CollectedCardsImportController;
 use App\Http\Controllers\MtgBulkPriceController;
+use App\Http\Controllers\CollectionManagementController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeckController;
 
 use App\Builders\CollectionCardQueryBuilder;
@@ -12,7 +14,7 @@ use App\Builders\CollectionCardQueryBuilder;
 use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
 use App\Models\CollectedCardsFromSets;
-use App\Models\Collections;
+use App\Models\CollectionManagement;
 use App\Models\DeckManagement;
 use App\Models\MtgImageLookup;
 use App\Models\MtgDeckBoardGroups;
@@ -158,6 +160,10 @@ Route::get('/decks', function () {
 
 Route::delete('/decks/{id}', [DeckController::class, 'destroy']);
 
+// Collections support
+Route::delete('/collections/{id}', [CollectionManagementController::class, 'destroy']);
+Route::get('/collections/{id}/export', [CollectionManagementController::class, 'export']);
+
 Route::post('/test-image-url', function (Request $request) {
     $url = $request->input('url');
     $cardName = $request->input('card_name');
@@ -283,8 +289,8 @@ Route::post('/collections/create', function (Request $request) {
         return response()->json(['error' => 'Collection name is required'], 400);
     }
     
-    $collection = new \App\Models\Collections();
-    $collection->name = $name;
+    $collection = new \App\Models\CollectionManagement();
+    $collection->collection_name = $name;
     $collection->description = $description;
     $collection->owner_id = 1;
     $collection->save();
@@ -297,8 +303,14 @@ Route::post('/collections/create', function (Request $request) {
 
 Route::post('/collections/import-csv', [CollectedCardsImportController::class, 'import']);
 
+Route::get('/collections/{id}/import-status', function ($id) {
+    $collection = CollectionManagement::findOrFail($id);
+    return response()->json(['status' => $collection->import_status]);
+});
+
+
 Route::get('/collections/{collection_id}/cards', function (Request $request, $collection_id) {
-    $collection = Collections::find($collection_id);
+    $collection = CollectionManagement::find($collection_id);
 
     if (!$collection) {
         return response()->json(['error' => 'Collection not found'], 404);
@@ -328,12 +340,13 @@ Route::get('/collections/{collection_id}/cards', function (Request $request, $co
 Route::post('/inventory/lookup-normalized', function (Request $request) {
     $names = $request->input('card_names', []);
     $collectionIds = $request->input('collection_ids', []);
+    $collectionIds = Arr::flatten($collectionIds);
     
     \Log::info('Incoming names: ' . json_encode($names));
     \Log::info('Collection IDs: ' . json_encode($collectionIds));
 
     // Skip CardDataNormalized entirely and go straight to the source
-    $setIds = SetsInCollection::whereIn('collection_id', $collectionIds)->pluck('id');
+    $setIds = SetsInCollection::whereIn('collection_management_id', $collectionIds)->pluck('id');
     \Log::info('Set IDs: ' . json_encode($setIds->toArray()));
 
     // Find cards directly by name in the cardFromSet relationship
@@ -359,3 +372,5 @@ Route::post('/inventory/lookup-normalized', function (Request $request) {
 });
 
 Route::post('/fetch-card-prices', [MtgBulkPriceController::class, 'fetchPrices']);
+
+Route::get('/dashboard/image-coverage', [DashboardController::class, 'imageCoverage']);

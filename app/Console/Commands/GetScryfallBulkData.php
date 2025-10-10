@@ -25,6 +25,16 @@ class GetScryfallBulkData extends Command
         $defaultDump = collect($bulkList)->firstWhere('type', 'default_cards');
         $downloadUri = $defaultDump['download_uri'];
         $expectedFilename = basename($downloadUri); // e.g. default-cards-2025-10-06.json
+
+        $alreadyImported = DB::table('scryfall_imports')
+            ->where('filename', $expectedFilename)
+            ->exists();
+
+        if ($alreadyImported) {
+            $this->info("Already imported {$expectedFilename}. Skipping.");
+            return;
+        }
+
         $localPath = storage_path("app/scryfall/{$expectedFilename}");
 
         // Ensure directory exists
@@ -47,7 +57,16 @@ class GetScryfallBulkData extends Command
             $this->info("✅ File downloaded successfully: {$localPath}");
         } else {
             $this->error("❌ File not found after download attempt.");
+            return;
         }
+
+        $existingFiles = glob(storage_path('app/scryfall/default-cards-*.json'));
+        foreach ($existingFiles as $file) {
+            if ($file !== $localPath) {
+                unlink($file);
+            }
+        }
+
 
         $this->info("Parsing and importing prices...");
         $cards = json_decode(file_get_contents($localPath), true);
@@ -78,6 +97,11 @@ class GetScryfallBulkData extends Command
                 $this->info("Imported $count cards...");
             }
         }
+        
+        DB::table('scryfall_imports')->insert([
+            'filename' => $expectedFilename,
+            'imported_at' => now(),
+        ]);
 
         $this->info("Done. Imported $count cards.");
     }

@@ -8,7 +8,7 @@ use App\Http\Controllers\DeckController;
 use App\Models\CardData;
 use App\Models\CardDataFromSetData;
 use App\Models\CardsInDeck;
-use App\Models\Collections;
+use App\Models\CollectionManagement;
 use App\Models\DeckManagement;
 use App\Models\SetData;
 
@@ -72,9 +72,7 @@ Route::get('/cardsfromsets/{setnames}/{rarities?}', function (string $setnames, 
     }
 
     $query = CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
-        ->where('set_name', '=', "$setnames")
-        ->whereRaw('number_in_set REGEXP ?', ['^[0-9]+$'])
-        ->whereNotNull('card_multiverse_id');
+        ->where('set_name', '=', "$setnames");
 
     // Only apply color filtering if colorFilters is provided and not empty
     if ($colorFilters && $colorFilters !== '') {
@@ -136,7 +134,28 @@ Route::get('/decks', function () {
 });
 
 Route::get('/collections', function () {
-    return Collections::get();
+    $collections = CollectionManagement::with(['setsInCollection.collectedCards'])->get();
+
+    return $collections->map(function ($collection) {
+
+        $totalCards = $collection->setsInCollection
+            ->flatMap(fn($set) => $set->collectedCards)
+            ->sum('card_count');
+
+
+        $total_unique_cards = $collection->setsInCollection->sum(function ($set) {
+            return $set->collectedCards->count();
+        });
+ 
+        return [
+            'id' => $collection->id,
+            'collection_name' => $collection->collection_name,
+            'description' => $collection->description,
+            //'import_status' => $collection->import_status,
+            'total_cards' => $totalCards,
+            'total_unique_cards' => $total_unique_cards
+        ];
+    });
 });
 
 use Illuminate\Http\Request;

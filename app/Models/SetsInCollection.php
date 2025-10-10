@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-use App\Models\Collections;
+use App\Models\CollectionManagement;
 use App\Models\CollectedCardsFromSets;
 use App\Models\SetData;
 
@@ -16,8 +16,13 @@ class SetsInCollection extends Model
 
     public function collection() : BelongsTo
     {
-        return $this->belongsTo(Collections::class, 'collection_id');
+        return $this->belongsTo(CollectionManagement::class, 'collection_management_id');
     }
+
+    public function collectionManagement()
+    {
+        return $this->belongsTo(CollectionManagement::class, 'collection_management_id');
+    }    
 
     public function magicSet() : BelongsTo
     {
@@ -35,7 +40,7 @@ class SetsInCollection extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'collection_id',
+        'collection_management_id',
         'set_id'
     ];
 }
