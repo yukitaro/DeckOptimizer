@@ -4,10 +4,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CollectedCardsImportController;
-use App\Http\Controllers\MtgBulkPriceController;
 use App\Http\Controllers\CollectionManagementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeckController;
+use App\Http\Controllers\MtgBulkPriceController;
+use App\Http\Controllers\RetrieveCardsByBoardGroup;
 
 use App\Builders\CollectionCardQueryBuilder;
 
@@ -19,6 +20,8 @@ use App\Models\DeckManagement;
 use App\Models\MtgImageLookup;
 use App\Models\MtgDeckBoardGroups;
 use App\Models\SetsInCollection;
+
+Route::get('/cardsInDeck/{deck_id}/boardgroups/{board_groups}', [RetrieveCardsByBoardGroup::class, 'getCardsByBoardGroup']);
 
 Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
     $deck = DeckManagement::findOrFail($deck_id);
@@ -157,6 +160,15 @@ Route::get('/decks', function () {
     return DeckManagement::limit($limit)
         ->get();
 });
+
+Route::get('/decks/archetypes', function () {
+    return DeckManagement::whereNotNull('archetype')
+        ->where('archetype', '!=', '')
+        ->select('archetype')
+        ->distinct()
+        ->pluck('archetype');
+});
+
 
 Route::delete('/decks/{id}', [DeckController::class, 'destroy']);
 

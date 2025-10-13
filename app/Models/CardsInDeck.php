@@ -20,9 +20,9 @@ class CardsInDeck extends Model
         return $this->belongsTo(CardDataNormalized::class, 'card_data_normalized_id');
     }
 
-    public function boardGroups(): BelongsTo
+    public function boardGroup(): BelongsTo
     {
-        return $this->belongsTo(MtgDeckBoardGroup::class, 'id', 'mtg_deck_board_group_id');
+        return $this->belongsTo(MtgDeckBoardGroups::class, 'mtg_deck_board_group_id', 'id');
     }
 
     /**
