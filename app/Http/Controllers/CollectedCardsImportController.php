@@ -23,10 +23,11 @@ class CollectedCardsImportController extends Controller
         $cacheKey = 'import_records_' . Str::uuid();
         Cache::put($cacheKey, $records, now()->addMinutes(30));
 
-Log::info("Dispatching import job", [
-  'mode' => $mode,
-  'recordsKey' => $cacheKey,
-  'collectionId' => $collectionId,
+Log::info("Dispatching ImportCollectedCardsFromCSV job", [
+    'recordsKey' => $recordsKey,
+    'recordCount' => is_array($records) ? count($records) : null,
+    'collectionId' => $collectionId,
+    'mode' => $mode,
 ]);
 
         ImportCollectedCardsFromCSV::dispatch($mode, $cacheKey, $collectionId);

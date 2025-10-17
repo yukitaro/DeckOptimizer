@@ -5,13 +5,15 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 use App\Console\Commands\GetScryfallBulkData;
+use App\Console\Commands\AuditScheduledJobs;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
 Schedule::command('scryfall:get-and-import-bulk-data')
-    ->dailyAt('03:00')
+    ->dailyAt('04:00')
+    ->timezone('America/Los_Angeles')
     ->sendOutputTo(storage_path('logs/scryfall_import.log'))
     ->runInBackground()
     ->withoutOverlapping()

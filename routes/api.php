@@ -386,3 +386,5 @@ Route::post('/inventory/lookup-normalized', function (Request $request) {
 Route::post('/fetch-card-prices', [MtgBulkPriceController::class, 'fetchPrices']);
 
 Route::get('/dashboard/image-coverage', [DashboardController::class, 'imageCoverage']);
+
+Route::get('/dashboard/data-coverage/{set_name?}', [DashboardController::class, 'dataCoverage']);
