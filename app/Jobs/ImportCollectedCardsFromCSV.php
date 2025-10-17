@@ -31,15 +31,30 @@ class ImportCollectedCardsFromCSV implements ShouldQueue
 
     public function handle()
     {
-        $records = Cache::pull($this->recordsKey);
+Log::info("Checking cache existence", [
+    'recordsKey' => $this->recordsKey,
+    'cacheExists' => Cache::has($this->recordsKey),
+]);
+        $records = Cache::get($this->recordsKey);
+
+Log::info("Cache hydration attempt", [
+    'recordsKey' => $this->recordsKey,
+    'recordsType' => gettype($records),
+    'recordCount' => is_array($records) ? count($records) : null,
+    'collectionManagementId' => $this->collectionId,
+]);        
 
         if (!is_array($records)) {
             Log::error("Import job failed: records payload missing or invalid", [
                 'collectionManagementId' => $this->collectionId,
                 'recordsKey' => $this->recordsKey,
+                'cacheExists' => Cache::has($this->recordsKey),
+                'recordsType' => gettype($records),
+                'recordsValue' => $records,
             ]);
             return;
         }
+
 
 Log::info("Import job triggered", [
     'collectionManagementId' => $this->collectionId,
@@ -93,5 +108,6 @@ Log::info("About to call importToCollection", [
         }
 
         $collection->save();
+        Cache::forget($this->recordsKey);
     }
 }
