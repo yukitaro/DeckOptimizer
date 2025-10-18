@@ -18,6 +18,7 @@ use App\Models\CollectedCardsFromSets;
 use App\Models\CollectionManagement;
 use App\Models\DeckManagement;
 use App\Models\MtgImageLookup;
+use App\Models\MtgJsonImportCandidate;
 use App\Models\MtgDeckBoardGroups;
 use App\Models\SetsInCollection;
 
@@ -388,3 +389,25 @@ Route::post('/fetch-card-prices', [MtgBulkPriceController::class, 'fetchPrices']
 Route::get('/dashboard/image-coverage', [DashboardController::class, 'imageCoverage']);
 
 Route::get('/dashboard/data-coverage/{set_name?}', [DashboardController::class, 'dataCoverage']);
+
+Route::get('/import-candidates', function () {
+    return \App\Models\MtgJsonImportCandidate::query()
+        ->where('imported_into_database', false)
+        ->where('ready_for_import', true)
+        ->orderByDesc('release_date')
+        ->get();
+});
+
+Route::post('/import-candidates/{setCode}/import', function ($setCode) {
+    Artisan::call('seed:sets', ['--sets' => $setCode]);
+
+    \App\Models\MtgJsonImportCandidate::where('set_code', $setCode)
+        ->update(['imported_into_database' => true]);
+
+    return response()->json(['status' => 'ok']);
+});
+
+Route::get('/import-candidates/ready-count', function () {
+    $count = \App\Models\MtgJsonImportCandidate::ready()->count();
+    return response()->json(['ready_count' => $count]);
+});

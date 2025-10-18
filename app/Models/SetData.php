@@ -28,6 +28,8 @@ class SetData extends Model
         'release_date',
         'total_cards',
         'set_code',
-        'card_metadata_id'
+        'card_metadata_id',
+        'imported_from_mtgjson',
+        'date_of_json_used_for_import'
     ];
 }
