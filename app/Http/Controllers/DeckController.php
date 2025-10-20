@@ -73,11 +73,15 @@ class DeckController extends Controller
         $importedDeckMainboard->save();
 
         foreach ($cardLinesToParse as $cardLine) {
-
             $pattern = "/(\d+)\s+(.*)/";
             preg_match($pattern, $cardLine, $matches);
 
             if (!isset($matches[2])) {
+                if ($cardLine === 'Deck' || $cardLine === 'Decklist') {
+                    $index++;
+                    continue; // skip header lines
+                }
+                
                 if (trim($cardLine) === '') {
                     $index++;
                     continue; // skip empty lines

@@ -17,6 +17,7 @@ use App\Models\CardsInDeck;
 use App\Models\CollectedCardsFromSets;
 use App\Models\CollectionManagement;
 use App\Models\DeckManagement;
+use App\Models\SetData;
 use App\Models\MtgImageLookup;
 use App\Models\MtgJsonImportCandidate;
 use App\Models\MtgDeckBoardGroups;
@@ -294,6 +295,31 @@ Route::post('/report-broken-images', function (Request $request) {
     ]);
 });
 
+Route::get('/collections', function () {
+    $collections = CollectionManagement::with(['setsInCollection.collectedCards'])->get();
+
+    return $collections->map(function ($collection) {
+
+        $totalCards = $collection->setsInCollection
+            ->flatMap(fn($set) => $set->collectedCards)
+            ->sum('card_count');
+
+
+        $total_unique_cards = $collection->setsInCollection->sum(function ($set) {
+            return $set->collectedCards->count();
+        });
+ 
+        return [
+            'id' => $collection->id,
+            'collection_name' => $collection->collection_name,
+            'description' => $collection->description,
+            //'import_status' => $collection->import_status,
+            'total_cards' => $totalCards,
+            'total_unique_cards' => $total_unique_cards
+        ];
+    });
+});
+
 Route::post('/collections/create', function (Request $request) {
     $name = $request->input('name');
     $description = $request->input('description', '');
@@ -410,4 +436,17 @@ Route::post('/import-candidates/{setCode}/import', function ($setCode) {
 Route::get('/import-candidates/ready-count', function () {
     $count = \App\Models\MtgJsonImportCandidate::ready()->count();
     return response()->json(['ready_count' => $count]);
+});
+
+Route::get('/magic-set-data/{set_code?}', function ($set_code = null) {
+    $query = \App\Models\SetData::query()
+        ->where('total_cards', '>', 91);
+
+    if ($set_code) {
+        $query->where('set_code', $set_code);
+    }
+
+    $data = $query->get();
+
+    return response()->json($data);
 });

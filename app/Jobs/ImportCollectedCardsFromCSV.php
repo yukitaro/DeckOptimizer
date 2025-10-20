@@ -31,18 +31,7 @@ class ImportCollectedCardsFromCSV implements ShouldQueue
 
     public function handle()
     {
-Log::info("Checking cache existence", [
-    'recordsKey' => $this->recordsKey,
-    'cacheExists' => Cache::has($this->recordsKey),
-]);
         $records = Cache::get($this->recordsKey);
-
-Log::info("Cache hydration attempt", [
-    'recordsKey' => $this->recordsKey,
-    'recordsType' => gettype($records),
-    'recordCount' => is_array($records) ? count($records) : null,
-    'collectionManagementId' => $this->collectionId,
-]);        
 
         if (!is_array($records)) {
             Log::error("Import job failed: records payload missing or invalid", [
@@ -55,13 +44,6 @@ Log::info("Cache hydration attempt", [
             return;
         }
 
-
-Log::info("Import job triggered", [
-    'collectionManagementId' => $this->collectionId,
-    'recordCount' => count($records), // ✅ use $records
-    'mode' => $this->mode,
-]);
-
         $collection = CollectionManagement::find($this->collectionId);
 
         if (!$collection) {
@@ -72,21 +54,7 @@ Log::info("Import job triggered", [
         $collection->import_status = 'processing';
         $collection->save();
 
-Log::info("Import started", [
-    'collectionManagementId' => $collection->id,
-    'collectionName' => $collection->collection_name ?? '(unnamed)',
-    'recordCount' => count($records), // ✅ use $records
-    'mode' => $this->mode,
-]);
-
         try {
-
-Log::info("About to call importToCollection", [
-    'mode' => $this->mode,
-    'recordsType' => gettype($this->records),
-    'collectionIdType' => gettype($this->collectionId),
-    'collectionIdValue' => $this->collectionId,
-]);            
             CollectedCardsImportService::importToCollection(
                 $this->mode,
                 $records,
@@ -94,10 +62,6 @@ Log::info("About to call importToCollection", [
             );
 
             $collection->import_status = 'complete';
-            Log::info("Import job kicked off", [
-                'collectionManagementId' => $collection->id,
-                'status' => 'complete',
-            ]);
         } catch (\Exception $e) {
             $collection->import_status = 'failed';
             Log::error("Import failed", [

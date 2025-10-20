@@ -23,7 +23,7 @@ class CardDataFromSetData extends Model
 
     public function cardMetadata() : HasOne
     {
-        return $this->hasOne(CardMetadata::class);
+        return $this->hasOne(CardMetadata::class, 'id', 'card_metadata_id');
     }
 
     public function collectedCards()

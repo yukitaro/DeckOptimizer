@@ -72,7 +72,7 @@ Route::get('/cardsfromsets/{setnames}/{rarities?}', function (string $setnames, 
     }
 
     $query = CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
-        ->where('set_name', '=', "$setnames");
+        ->whereIn('set_name', explode(',', "$setnames"));
 
     // Only apply color filtering if colorFilters is provided and not empty
     if ($colorFilters && $colorFilters !== '') {
@@ -128,34 +128,16 @@ Route::post('/deck', [DeckController::class, 'store']);
  */
 Route::get('/decks', function () {
     $limit = request('limit');
+    $retrieveRecent = request('retrieveRecent') || null;
 
-    return DeckManagement::limit($limit)
-        ->get();
-});
-
-Route::get('/collections', function () {
-    $collections = CollectionManagement::with(['setsInCollection.collectedCards'])->get();
-
-    return $collections->map(function ($collection) {
-
-        $totalCards = $collection->setsInCollection
-            ->flatMap(fn($set) => $set->collectedCards)
-            ->sum('card_count');
-
-
-        $total_unique_cards = $collection->setsInCollection->sum(function ($set) {
-            return $set->collectedCards->count();
-        });
- 
-        return [
-            'id' => $collection->id,
-            'collection_name' => $collection->collection_name,
-            'description' => $collection->description,
-            //'import_status' => $collection->import_status,
-            'total_cards' => $totalCards,
-            'total_unique_cards' => $total_unique_cards
-        ];
-    });
+    if ($retrieveRecent) {
+        return DeckManagement::orderBy('created_at', 'desc')
+            ->limit($retrieveRecent)
+            ->get();
+    } else {
+        return DeckManagement::limit($limit)
+            ->get();
+    }
 });
 
 use Illuminate\Http\Request;

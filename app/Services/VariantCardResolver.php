@@ -9,14 +9,32 @@ class VariantCardResolver
 {
     public static function resolveCardData(string $rawName, string $setCode): ?CardDataFromSetData
     {
+        $parsed = self::parseName($rawName);
+        $nameLower = mb_strtolower($parsed['base_name']);
+
+        // Direct match by name within the set (try both columns)
+        $direct = CardDataFromSetData::query()
+            ->whereRaw('LOWER(name) = ?', [$nameLower])
+            ->where(function ($q) use ($setCode) {
+                $q->where('set_name', $setCode);
+            })
+            ->first();
+
+        if ($direct) {
+            return $direct;
+        }
+
+        // Fallback to metadata-driven resolution
         $metadata = self::resolveMetadata($rawName, $setCode);
         if (!$metadata) {
             return null;
         }
-        
-        // Return the card from the specific set, not just any card with this metadata
-        return CardDataFromSetData::where('card_metadata_id', $metadata->id)
-            ->where('set_name', $setCode)  // This is the missing constraint!
+
+        return CardDataFromSetData::query()
+            ->where('card_metadata_id', $metadata->id)
+            ->where(function ($q) use ($setCode) {
+                $q->where('set_name', $setCode);
+            })
             ->first();
     }
 
@@ -25,9 +43,16 @@ class VariantCardResolver
         $parsed = self::parseName($rawName);
         $filters = self::getVariantFilters($parsed['variant_tag']);
 
-        $metadataIds = CardDataFromSetData::where('set_name', $setCode)
+        $metadataIds = CardDataFromSetData::query()
             ->whereNotNull('card_metadata_id')
+            ->where(function ($q) use ($setCode) {
+                $q->where('set_name', $setCode);
+            })
             ->pluck('card_metadata_id');
+
+        if ($metadataIds->isEmpty()) {
+            return null;
+        }
 
         $query = CardMetadata::where('normalized_name', $parsed['base_name'])
             ->whereIn('id', $metadataIds);
@@ -35,7 +60,10 @@ class VariantCardResolver
         foreach ($filters as $key => $value) {
             if (is_array($value)) {
                 if (empty($value)) {
-                    $query->where(fn($q) => $q->whereNull("normalized_attributes->$key")->orWhereJsonLength("normalized_attributes->$key", 0));
+                    $query->where(fn($q) =>
+                        $q->whereNull("normalized_attributes->$key")
+                        ->orWhereJsonLength("normalized_attributes->$key", 0)
+                    );
                 } else {
                     $query->whereJsonContains("normalized_attributes->$key", $value);
                 }
