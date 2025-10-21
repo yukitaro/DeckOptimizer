@@ -158,9 +158,15 @@ Route::post('/deck', [DeckController::class, 'store']);
 
 Route::get('/decks', function () {
     $limit = request('limit');
+    $retrieveRecent = request('retrieveRecent');
 
-    return DeckManagement::limit($limit)
-        ->get();
+    if (!is_null($retrieveRecent)) {
+        return DeckManagement::orderBy('created_at', 'desc')
+            ->limit((int) $retrieveRecent)
+            ->get();
+    }
+
+    return DeckManagement::limit((int) ($limit ?? 10))->get();
 });
 
 Route::get('/decks/archetypes', function () {
@@ -319,6 +325,7 @@ Route::get('/collections', function () {
         ];
     });
 });
+
 
 Route::post('/collections/create', function (Request $request) {
     $name = $request->input('name');

@@ -27,11 +27,16 @@ class SetDataSeeder extends Seeder
      * Run the database seeds.
      */
     public function run(): void
-    {
-        $onlySets = collect(explode(',', getenv('SEEDER_SETS') ?: ''))
-            ->filter()
+    {        
+        $onlySetsRaw = getenv('SEEDER_SETS');
+        $onlySets = collect(explode(',', $onlySetsRaw ?: ''))
             ->map(fn($s) => strtoupper(trim($s)))
+            ->filter()
             ->toArray();
+
+        $filterEnabled = count($onlySets) > 0;
+
+        \Log::info("Seeder mode: " . ($filterEnabled ? "Filtered by SEEDER_SETS" : "Full import"));
 
         $jsonDataPath = base_path('data/AllSetFiles');
         $jsonSetData = glob($jsonDataPath . '/*.json'); 
