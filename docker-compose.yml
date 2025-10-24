@@ -1,7 +1,7 @@
 services:
     frontend:
         build:
-            context: ./frontend
+            context: ./frontend/deck-optimizer-frontend
             dockerfile: Dockerfile
         ports:
         - "8284:5173"
@@ -9,7 +9,7 @@ services:
         - ./frontend:/app
     laravel.test:
         build:
-            context: './vendor/laravel/sail/runtimes/8.4'
+            context: './docker/8.4'
             dockerfile: Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP}'
@@ -45,7 +45,7 @@ services:
             MYSQL_EXTRA_OPTIONS: '${MYSQL_EXTRA_OPTIONS}'
         volumes:
             - '/home/ktkihara/deckdb:/var/lib/mysql'
-            - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+            - './docker/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
         networks:
             - sail
         healthcheck:
@@ -56,7 +56,24 @@ services:
                 - '-p${DB_PASSWORD}'
             retries: 3
             timeout: 5s
+    puppeteer:
+        build:
+            context: git@github.com:yukitaro/DeckOptimizer-puppeteer-service.git#main
+            dockerfile: Dockerfile
+        ports:
+            - "3001:3000"
+        volumes:
+            - ./puppeteer-service:/app
+            - puppeteer_node_modules:/app/node_modules
+        restart: unless-stopped
+        networks:
+            sail:
+                aliases:
+                    - puppeteer            
+
 networks:
     sail:
         driver: bridge
 
+volumes:
+  puppeteer_node_modules:

@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
+use App\DTOs\DeckImportDTO;
 use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
 use App\Models\DeckManagement;
 use App\Models\DeckOwner;
+use App\Models\MtgArchetype;
 
 class DeckController extends Controller
 {
@@ -59,7 +61,8 @@ class DeckController extends Controller
             'external_link' => $request['deckLink'],
             'num_cards' => $request['num_cards'] ?? 0,
             'archetype' => $request['deckArchetype'] ?? '',
-            'format' => $request['deckFormat'] ?? 'pauper'
+            'format' => $request['deckFormat'] ?? 'pauper',
+            'archetype_id' => $request['archetypeId'] ?? null
         ]);
 
         $importedDeck->save();
@@ -153,6 +156,68 @@ class DeckController extends Controller
             'matched_cards' => $matchesFound,
             'errors' => $errors,
         ]);
+    }
+
+    public function storeFromDTO(DeckImportDTO $dto, DeckOwner $owner)
+    {
+        $deck = $owner->ownedDecks()->create([
+            'deck_name' => $dto->name,
+            'description' => $dto->description,
+            'external_link' => $dto->sourceUrl,
+            'num_cards' => 0, // will be updated later
+            'archetype' => $dto->archetype ?? '',
+            'format' => $dto->format ?? 'pauper'
+        ]);
+
+        $mainboardGroup = $deck->boardGroups()->create([
+            'board_type' => 'main',
+            'label' => 'Main Deck'
+        ]);
+
+        $sideboardGroup = $deck->boardGroups()->create([
+            'board_type' => 'side',
+            'label' => 'Sideboard'
+        ]);
+
+        $totalMain = $this->hydrateCards($dto->mainboard, $mainboardGroup, $deck);
+        $totalSide = $this->hydrateCards($dto->sideboard, $sideboardGroup, $deck);
+
+        $mainboardGroup->num_cards = $totalMain;
+        $sideboardGroup->num_cards = $totalSide;
+        $deck->num_cards = $totalMain + $totalSide;
+
+        $mainboardGroup->save();
+        $sideboardGroup->save();
+        $deck->save();
+
+        return $deck;
+    }
+
+    private function hydrateCards(array $cards, $group, $deck): int {
+        $total = 0;
+
+        foreach ($cards as $card) {
+            $match = CardDataNormalized::whereRaw('LOWER(TRIM(normalized_name)) = ?', [strtolower(trim($card['name']))])->first();
+
+            if ($match) {
+                $group->cardsInGroup()->create([
+                    'card_name' => $match->normalized_name,
+                    'card_count' => $card['count'],
+                    'image_url' => $match->image_url_to_use,
+                    'card_data_normalized_id' => $match->id,
+                    'deck_management_id' => $deck->id,
+                ]);
+                $total += $card['count'];
+            }
+        }
+
+        return $total;
+    }    
+
+    public function knownArchetypes(): Collection
+    {
+        return MtgArchetype::orderBY('name', 'ASC')
+            ->get(['name']);
     }
 
     /**

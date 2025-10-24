@@ -7,6 +7,7 @@ use App\Http\Controllers\CollectedCardsImportController;
 use App\Http\Controllers\CollectionManagementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeckController;
+use App\Http\Controllers\DeckScrapersController;
 use App\Http\Controllers\MtgBulkPriceController;
 use App\Http\Controllers\RetrieveCardsByBoardGroup;
 
@@ -176,6 +177,8 @@ Route::get('/decks/archetypes', function () {
         ->distinct()
         ->pluck('archetype');
 });
+
+Route::get('/decks/known-archetypes', [DeckController::class, 'knownArchetypes']);
 
 
 Route::delete('/decks/{id}', [DeckController::class, 'destroy']);
@@ -457,3 +460,5 @@ Route::get('/magic-set-data/{set_code?}', function ($set_code = null) {
 
     return response()->json($data);
 });
+
+Route::post('/deck/import-deck-from-url', [DeckScrapersController::class, 'processImportFromUrl']);

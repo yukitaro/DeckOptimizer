@@ -20,10 +20,13 @@
 /storage/pail
 /vendor
 /data/*.csv
+/data/*.txt
 /data/AllSetFiles/*.json
 /data/AllPrintingsCSVFiles_0906/*.csv
 /app/sample
 /deckdb
+/puppeteer-service
+/DeckOptimizer-mtg-scrapers
 Homestead.json
 Homestead.yaml
 Thumbs.db
