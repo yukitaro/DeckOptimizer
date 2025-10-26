@@ -13,6 +13,7 @@ use App\Http\Controllers\RetrieveCardsByBoardGroup;
 
 use App\Builders\CollectionCardQueryBuilder;
 
+use App\Models\CardDataFromSetData;
 use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
 use App\Models\CollectedCardsFromSets;
@@ -453,7 +454,25 @@ Route::get('/magic-set-data/{set_code?}', function ($set_code = null) {
         ->where('total_cards', '>', 91);
 
     if ($set_code) {
-        $query->where('set_code', $set_code);
+        if ($set_code === 'all-released-sets') {
+            $all_released_sets = $query->where('total_cards', '>', 91) // Include all sets with ARN being the smallest
+                                            ->where('release_date', '<=', now())
+                                            ->orderBy('release_date', 'asc')
+                                            ->get();
+            return $all_released_sets->map(function ($set) {
+                return [
+                    'id' => $set->id,
+                    'set_name' => $set->set_name,
+                    'set_code' => $set->official_set_code,
+                    'release_date' => $set->release_date,
+                    'total_cards' => $set->total_cards
+                ];
+            });
+
+        }
+        else {
+            $query->where('set_code', $set_code);
+        }
     }
 
     $data = $query->get();
@@ -462,3 +481,24 @@ Route::get('/magic-set-data/{set_code?}', function ($set_code = null) {
 });
 
 Route::post('/deck/import-deck-from-url', [DeckScrapersController::class, 'processImportFromUrl']);
+
+Route::get('/card/{card_name}', function($card_name) {
+    return CardDataFromSetData::query()
+        ->join('magic_set_data', 'card_data_from_set_data.magic_set_data_id', '=', 'magic_set_data.id')
+        ->whereRaw('LOWER(card_data_from_set_data.name) LIKE ?', ['%' . strtolower($card_name) . '%'])
+        ->orderByRaw("STR_TO_DATE(magic_set_data.release_date, '%Y-%m-%d') ASC")
+        ->select(
+            'card_data_from_set_data.id',
+            'card_data_from_set_data.name',
+            'card_data_from_set_data.set_name',
+            'card_data_from_set_data.number_in_set',
+            'card_data_from_set_data.image_url',
+            'card_data_from_set_data.slug',
+            'magic_set_data.release_date'
+        )
+        ->get();
+});
+
+Route::get('/dashboard/card/{card_id}/metadata', [DashboardController::class, 'cardMetadata']);
+
+Route::get('/dashboard/card/{set}/{slug}/{number}', [DashboardController::class, 'cardMetadataBySlugAndNumber']);

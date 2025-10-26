@@ -30,6 +30,6 @@ class SetData extends Model
         'set_code',
         'card_metadata_id',
         'imported_from_mtgjson',
-        'date_of_json_used_for_import'
+        'date_of_json_used_for_import',
     ];
 }

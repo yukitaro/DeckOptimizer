@@ -40,6 +40,13 @@ class CardDataNormalized extends Model
     {
         return $this->belongsTo(SetData::class, 'magic_set_data_id');
     }
+
+    public function otherPrintings(): HasMany
+    {
+        return $this->hasMany(CardDataNormalized::class, 'normalized_name', 'normalized_name')
+            ->whereColumn('source_printing_id', '!=', 'source_printing_id');
+    }
+
     /**
      * The attributes that are mass assignable.
      *

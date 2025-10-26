@@ -6,6 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+use App\Models\DeckOwner;
+use App\Models\CardDataNormalized;
+use App\Models\CardsInDeck;
+use App\Models\MtgArchetype;
+use App\Models\MtgDeckBoardGroups;
 
 use Laravel\Sanctum\HasApiTokens;
 
@@ -39,6 +46,12 @@ class DeckManagement extends Model
             'card_data_normalized_id'      // Local key on CardsInDeck
         );
     }
+
+    public function archetypeModel(): BelongsTo
+    {
+        return $this->belongsTo(MtgArchetype::class, 'archetype_id');
+    }
+
     /**
      * The attributes that are mass assignable.
      *

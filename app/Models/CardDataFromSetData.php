@@ -6,8 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-use App\Models\SetData;
+use App\Models\CardMetadata;
+use App\Models\CardsInCollection;
+use App\Models\CardsInDeck;
 use App\Models\CollectedCardsFromSets;
+use App\Models\DeckManagement;
+use App\Models\MtgBulkPrices;
+use App\Models\SetData;
 
 class CardDataFromSetData extends Model
 {
@@ -31,6 +36,9 @@ class CardDataFromSetData extends Model
         return $this->hasMany(CollectedCardsFromSets::class, 'card_data_id');
     }
 
+    public function bulkPrice() {
+        return $this->hasOne(MtgBulkPrices::class, 'scryfall_id', 'card_metadata.scryfallId');
+    }
  
     /**
      * The attributes that are mass assignable.
@@ -58,6 +66,8 @@ class CardDataFromSetData extends Model
         'toughness',
         'type',
         'types',
-        'image_url'
+        'image_url',
+        'image_normalized_at',
+        'slug'
     ];
 }

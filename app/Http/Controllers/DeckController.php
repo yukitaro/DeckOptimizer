@@ -80,14 +80,9 @@ class DeckController extends Controller
             preg_match($pattern, $cardLine, $matches);
 
             if (!isset($matches[2])) {
-                if ($cardLine === 'Deck' || $cardLine === 'Decklist') {
+                if (in_array(trim($cardLine), ['Deck', 'Decklist', ''])) {
                     $index++;
-                    continue; // skip header lines
-                }
-                
-                if (trim($cardLine) === '') {
-                    $index++;
-                    continue; // skip empty lines
+                    continue;
                 }
 
                 if (stripos($cardLine, 'sideboard') !== false) {
@@ -103,9 +98,8 @@ class DeckController extends Controller
                     ]);
 
                     $importedDeckSideboard = $currentBoardGroup;
-
                     $current_total_cards = 0;
-                    continue; // skip sideboard lines for now
+                    continue;
                 }
 
                 $errors[] = [
@@ -113,20 +107,29 @@ class DeckController extends Controller
                     'input' => $cardLine,
                     'error' => 'Line format invalid or incomplete'
                 ];
+                $index++;
                 continue;
             }
 
-            $matchingCard = CardDataNormalized::whereRaw('LOWER(TRIM(normalized_name)) = ?', [strtolower(trim($matches[2]))])
-                ->first();
+            $cardName = trim($matches[2]);
+            $matchingCard = CardDataNormalized::whereRaw('LOWER(TRIM(normalized_name)) = ?', [strtolower($cardName)])->first();
 
+            // Fallback: try to match front face of split cards
             if (!$matchingCard) {
-                $errors[] = [
-                    'line' => $index + 1,
-                    'input' => $matches[2],
-                    'error' => 'No matching card found for: ' . $matches[2]
-                ];
-                //Log::warning("Unresolved card during import: '{$matches[2]}' on line {$index + 1}");
-            } else {
+                $similarCards = CardDataNormalized::where('normalized_name', 'LIKE', '%' . $cardName . '%')->get();
+
+                foreach ($similarCards as $similarCard) {
+                    if (str_contains($similarCard->normalized_name, '//')) {
+                        $frontName = explode('//', $similarCard->normalized_name)[0];
+                        if (strtolower(trim($frontName)) === strtolower($cardName)) {
+                            $matchingCard = $similarCard;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if ($matchingCard) {
                 $current_total_cards += (int) $matches[1];
                 $matchesFound[] = $matchingCard->normalized_name;
 
@@ -137,6 +140,12 @@ class DeckController extends Controller
                     'card_data_normalized_id' => $matchingCard->id,
                     'deck_management_id' => $importedDeck->id,
                 ]);
+            } else {
+                $errors[] = [
+                    'line' => $index + 1,
+                    'input' => $cardName,
+                    'error' => 'No matching card found for: ' . $cardName
+                ];
             }
 
             $index++;

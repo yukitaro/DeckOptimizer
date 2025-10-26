@@ -12,7 +12,7 @@ class CardsInDeck extends Model
 
     public function deckManagedBy() : BelongsTo
     {
-        return $this->belongsTo(DeckManagement::class, 'cards_in_deck_id');
+        return $this->belongsTo(DeckManagement::class, 'deck_management_id');
     }
 
     public function normalizedCard(): BelongsTo
