@@ -1,0 +1,24 @@
+services:
+  puppeteer:
+    build:
+      context: ./puppeteer-service
+      dockerfile: Dockerfile
+    container_name: deckoptimizer-puppeteer
+    ports:
+      - "3001:3000"
+    volumes:
+      - puppeteer_node_modules:/app/node_modules
+      - /mnt/user/appdata/deckoptimizer/puppeteer-cache:/app/cache
+    environment:
+      NODE_ENV: production
+      PUPPETEER_CACHE_DIR: /app/cache
+    restart: unless-stopped
+    networks:
+      - deckoptimizer-network
+
+networks:
+  deckoptimizer-network:
+    external: true
+
+volumes:
+  puppeteer_node_modules:

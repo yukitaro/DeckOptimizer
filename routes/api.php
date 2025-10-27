@@ -483,9 +483,10 @@ Route::get('/magic-set-data/{set_code?}', function ($set_code = null) {
 Route::post('/deck/import-deck-from-url', [DeckScrapersController::class, 'processImportFromUrl']);
 
 Route::get('/card/{card_name}', function($card_name) {
+    $normalizedInput = strtolower(preg_replace('/[^a-z0-9]+/i', ' ', $card_name));
     return CardDataFromSetData::query()
         ->join('magic_set_data', 'card_data_from_set_data.magic_set_data_id', '=', 'magic_set_data.id')
-        ->whereRaw('LOWER(card_data_from_set_data.name) LIKE ?', ['%' . strtolower($card_name) . '%'])
+        ->whereRaw('MATCH(card_data_from_set_data.name) AGAINST(? IN BOOLEAN MODE)', ['"' . $normalizedInput . '"'])
         ->orderByRaw("STR_TO_DATE(magic_set_data.release_date, '%Y-%m-%d') ASC")
         ->select(
             'card_data_from_set_data.id',
