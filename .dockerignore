@@ -1,0 +1,30 @@
+# Node and PHP junk
+node_modules
+vendor
+storage
+deckdb
+# -- only if I need to copy from dev
+mysql 
+#  -- only if I need to restore from dev
+mysql-backup.sql
+# -- only if I need to restore from dev
+deckoptimizer-dev.sql 
+laravel.log
+
+# Frontend build artifacts
+frontend/deck-optimizer-frontend/dist
+frontend/deck-optimizer-frontend/node_modules
+
+# Git and system files
+.git
+.gitignore
+.env
+.env.*
+*.log
+*.sqlite
+*.zip
+*.tar.gz
+*.bak
+*.DS_Store
+
+!DeckOptimizer-mtg-scrapers/

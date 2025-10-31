@@ -98,7 +98,7 @@ class SetDataSeeder extends Seeder
 
                                 $cardRow = $existingSet->cardsInSet()->updateOrCreate(
                                     [
-                                        'card_uuid_id' => $cardJson['uuid'],
+                                        'card_uuid' => $cardJson['uuid'],
                                         'set_name' => $setCode,
                                         'number_in_set' => $cardJson['number'],
                                     ],

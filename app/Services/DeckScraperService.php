@@ -33,9 +33,30 @@ class DeckScraperService
             throw new \Exception("Scraper returned invalid HTML");
         }
 
-        file_put_contents(storage_path('logs/scraper_raw.html'), $html);
+        file_put_contents('/tmp/scrape_probe_before_call.log', "about to call parseDeck\n", FILE_APPEND|LOCK_EX);
+        try {
+            file_put_contents(storage_path('logs/scraper_raw.html'), $html, LOCK_EX);
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to write scraper_raw.html', ['error' => $e->getMessage()]);
+            @file_put_contents('/tmp/scraper_raw.html', $html);
+        }
 
-        $deckData = $scraper->parseDeck($html, $url);
+        try {
+            $deckData = $scraper->parseDeck($html, $url);
+            \Log::info('Deck parsed successfully', ['name' => $deckData['name'] ?? null]);
+        } catch (\Throwable $e) {
+            \Log::error('Deck parse failed', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+
+
+\Log::info('Parsed deck', [
+    'mainboard' => $deckData['mainboard'],
+    'sideboard' => $deckData['sideboard'],
+]);
 
         return new DeckImportDTO(
             name: $deckData['name'],

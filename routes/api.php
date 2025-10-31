@@ -25,7 +25,13 @@ use App\Models\MtgJsonImportCandidate;
 use App\Models\MtgDeckBoardGroups;
 use App\Models\SetsInCollection;
 
-Route::get('/cardsInDeck/{deck_id}/boardgroups/{board_groups}', [RetrieveCardsByBoardGroup::class, 'getCardsByBoardGroup']);
+Route::get('/health', fn() => response()->json(['status' => 'ok']));
+
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
+});
+
+Route::post('/cardsInDeck/{deck_id}/boardgroups/{board_groups}', [RetrieveCardsByBoardGroup::class, 'getCardsByBoardGroup']);
 
 Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
     $deck = DeckManagement::findOrFail($deck_id);
@@ -392,12 +398,7 @@ Route::post('/inventory/lookup-normalized', function (Request $request) {
     $collectionIds = $request->input('collection_ids', []);
     $collectionIds = Arr::flatten($collectionIds);
     
-    \Log::info('Incoming names: ' . json_encode($names));
-    \Log::info('Collection IDs: ' . json_encode($collectionIds));
-
-    // Skip CardDataNormalized entirely and go straight to the source
     $setIds = SetsInCollection::whereIn('collection_management_id', $collectionIds)->pluck('id');
-    \Log::info('Set IDs: ' . json_encode($setIds->toArray()));
 
     // Find cards directly by name in the cardFromSet relationship
     $cards = CollectedCardsFromSets::whereIn('set_in_collection_id', $setIds)
@@ -417,7 +418,6 @@ Route::post('/inventory/lookup-normalized', function (Request $request) {
             'variants' => $group
         ]);
 
-    \Log::info('Grouped results: ' . json_encode($grouped->keys()));
     return response()->json($grouped->values());
 });
 
@@ -483,10 +483,9 @@ Route::get('/magic-set-data/{set_code?}', function ($set_code = null) {
 Route::post('/deck/import-deck-from-url', [DeckScrapersController::class, 'processImportFromUrl']);
 
 Route::get('/card/{card_name}', function($card_name) {
-    $normalizedInput = strtolower(preg_replace('/[^a-z0-9]+/i', ' ', $card_name));
     return CardDataFromSetData::query()
         ->join('magic_set_data', 'card_data_from_set_data.magic_set_data_id', '=', 'magic_set_data.id')
-        ->whereRaw('MATCH(card_data_from_set_data.name) AGAINST(? IN BOOLEAN MODE)', ['"' . $normalizedInput . '"'])
+        ->whereRaw('MATCH(card_data_from_set_data.name) AGAINST(? IN BOOLEAN MODE)', ['"' . $card_name . '"'])
         ->orderByRaw("STR_TO_DATE(magic_set_data.release_date, '%Y-%m-%d') ASC")
         ->select(
             'card_data_from_set_data.id',

@@ -15,6 +15,8 @@ class CardMetadata extends Model
     }
 
     protected $casts = [
+        'purchaseUrls' => 'array',
+        'identifiers' => 'array',        
         'normalized_attributes' => 'array',
     ];
 

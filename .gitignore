@@ -30,3 +30,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+deckoptimizer-dev.sql
+quick-sync.sh
+deploy-to-unraid.sh

@@ -15,22 +15,29 @@ rsync -avz --progress \
   --exclude 'node_modules' \
   --exclude '.git' \
   --exclude '.env' \
-  --exclude 'vendor' \
+  --exclude '/vendor' \
   --exclude 'storage/framework/cache/*' \
   --exclude 'storage/framework/sessions/*' \
   --exclude 'storage/framework/views/*' \
   --exclude 'storage/logs/*' \
   --exclude 'bootstrap/cache/*' \
+  --exclude 'deckoptimizer-dev.sql' \
   --exclude 'deckdb' \
   --exclude 'frontend/deck-optimizer-frontend/dist' \
   ./ ${UNRAID_USER}@${UNRAID_IP}:${DEST_PATH}/
 
+echo "📦 Syncing scraper files..."
+rsync "${RSYNC_OPTS[@]}" DeckOptimizer-mtg-scrapers/ \
+"${UNRAID_USER}@${UNRAID_IP}:${DEST_PATH}/DeckOptimizer-mtg-scrapers/"
+
 echo "✅ Sync complete!"
 
+source ./check-rebuild-needed.sh
 # Step 2: Deploy on Unraid
 echo ""
 echo "🔧 Step 2: Deploying on Unraid..."
 ssh ${UNRAID_USER}@${UNRAID_IP} << 'ENDSSH'
+REBUILD=${REBUILD}
 cd /mnt/user/appdata/deckoptimizer
 
 # Setup environment
@@ -68,7 +75,14 @@ echo "✅ Composer dependencies installed"
 
 # NOW start containers (vendor exists on host)
 echo "🐳 Starting Docker containers..."
-docker-compose -f docker-compose.prod.yml up -d --build
+# Start containers
+if [ "\$REBUILD" = true ]; then
+  echo "🔁 Rebuilding Docker images..."
+  docker-compose -f docker-compose.prod.yml up -d --build
+else
+  echo "🚀 Starting containers without rebuild..."
+  docker-compose -f docker-compose.prod.yml up -d
+fi
 
 echo "⏳ Waiting for services to start..."
 sleep 25
@@ -78,8 +92,6 @@ echo "🔧 Running Laravel setup..."
 docker exec deckoptimizer-backend php artisan config:cache
 docker exec deckoptimizer-backend php artisan route:cache
 docker exec deckoptimizer-backend php artisan view:cache
-docker exec deckoptimizer-backend php artisan migrate --force
-docker exec deckoptimizer-backend php artisan storage:link
 
 echo "✅ Deployment complete!"
 docker-compose -f docker-compose.prod.yml ps
