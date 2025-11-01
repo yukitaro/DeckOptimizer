@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Auth\InviteRegistrationController;
 use App\Http\Controllers\CardDataController;
 use App\Http\Controllers\DeckController;
 
@@ -149,3 +150,6 @@ Route::post('/csrf-check', function (Request $request) {
         'user' => auth()->user(),
     ]);
 });
+
+Route::get('/register', [InviteRegistrationController::class, 'showForm']);
+Route::post('/register', [InviteRegistrationController::class, 'register']);

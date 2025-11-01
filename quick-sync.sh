@@ -17,7 +17,8 @@ EXCLUDES=(
   --exclude storage/framework/cache/*
   --exclude storage/framework/sessions/*
   --exclude storage/framework/views/*
-  --exclude storage/logs/*
+  --exclude 'storage/logs/'
+  --exclude 'storage/logs/**'
   --exclude bootstrap/cache/*
   --exclude bootstrap-cache
   --exclude deckdb

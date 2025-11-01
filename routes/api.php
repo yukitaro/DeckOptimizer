@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CollectedCardsImportController;
@@ -24,6 +26,7 @@ use App\Models\MtgImageLookup;
 use App\Models\MtgJsonImportCandidate;
 use App\Models\MtgDeckBoardGroups;
 use App\Models\SetsInCollection;
+use App\Models\User;
 
 Route::get('/health', fn() => response()->json(['status' => 'ok']));
 
@@ -502,3 +505,21 @@ Route::get('/card/{card_name}', function($card_name) {
 Route::get('/dashboard/card/{card_id}/metadata', [DashboardController::class, 'cardMetadata']);
 
 Route::get('/dashboard/card/{set}/{slug}/{number}', [DashboardController::class, 'cardMetadataBySlugAndNumber']);
+
+Route::post('/login', function (Request $request) {
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
+
+    $user = User::where('email', $request->email)->first();
+
+    if (! $user || ! Hash::check($request->password, $user->password)) {
+        return response()->json(['message' => 'Invalid credentials'], 401);
+    }
+
+    return response()->json([
+        'token' => $user->createToken('deckoptimizer')->plainTextToken,
+        'user' => $user,
+    ]);
+});
