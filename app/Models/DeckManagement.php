@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Enums\Visibility;
 use App\Models\DeckOwner;
 use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
@@ -65,6 +66,11 @@ class DeckManagement extends Model
         'num_cards',
         'archetype',
         'format',
-        'archetype_id'
-    ];    
+        'archetype_id',
+        'visibility',
+    ];
+
+    protected $casts = [
+        'visibility' => Visibility::class,
+    ];
 }

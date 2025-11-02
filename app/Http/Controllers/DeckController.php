@@ -12,6 +12,7 @@ use App\Models\CardsInDeck;
 use App\Models\DeckManagement;
 use App\Models\DeckOwner;
 use App\Models\MtgArchetype;
+use App\Models\User;
 
 class DeckController extends Controller
 {
@@ -46,15 +47,8 @@ class DeckController extends Controller
 
         $cardLinesToParse = preg_split('/\R/', $request->input('deckData'));
 
-        $owner_login = 'yukitaro';
-
-        $owner_data = DeckOwner::firstOrCreate(
-            ['owner_login' => $owner_login],
-            ['free_text' => 'haha these are all mine', 'deck_id' => 1]
-        );
-        
-        $owner_data->save();
-       
+        $owner_data = auth()->user();
+               
         $importedDeck = $owner_data->ownedDecks()->create([
             'deck_name' => $request['deckName'],
             'description' => $request['deckDescription'],
@@ -62,7 +56,8 @@ class DeckController extends Controller
             'num_cards' => $request['num_cards'] ?? 0,
             'archetype' => $request['deckArchetype'] ?? '',
             'format' => $request['deckFormat'] ?? 'pauper',
-            'archetype_id' => $request['archetypeId'] ?? null
+            'archetype_id' => $request['archetypeId'] ?? null,
+            'visibility' => strtolower($request['deckVisibility'] ?? 'public'),
         ]);
 
         $importedDeck->save();
@@ -259,6 +254,12 @@ class DeckController extends Controller
     public function destroy($id)
     {
         $deck = DeckManagement::findOrFail($id);
+
+        $authid = auth()->id();
+        \Log::info('Attempting to delete deck ID: ' . $id . ' owned by user ID: ' . $deck->deck_owner_id . ' authid is ' . $authid);
+        if ($deck->deck_owner_id !== auth()->id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         // Delete related cards
         $deck->cardsInDeck()->delete();

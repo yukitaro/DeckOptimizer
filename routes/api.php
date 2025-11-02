@@ -165,19 +165,26 @@ Route::get('/sideboard/{deck_id}', function ($deck_id) {
     return response()->json($enriched);
 });
 
-Route::post('/deck', [DeckController::class, 'store']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/deck', [DeckController::class, 'store']);
+});
 
-Route::get('/decks', function () {
+Route::middleware('auth:sanctum')->get('/decks', function () {
     $limit = request('limit');
     $retrieveRecent = request('retrieveRecent');
 
     if (!is_null($retrieveRecent)) {
-        return DeckManagement::orderBy('created_at', 'desc')
+        return DeckManagement::where('deck_owner_id', auth()->id())
+            ->orWhere('visibility', 'public')
+            ->orderBy('created_at', 'desc')
             ->limit((int) $retrieveRecent)
             ->get();
     }
 
-    return DeckManagement::limit((int) ($limit ?? 10))->get();
+    return DeckManagement::where('deck_owner_id', auth()->id())
+        ->orWhere('visibility', 'public')
+        ->limit((int) ($limit ?? 10))
+        ->get();
 });
 
 Route::get('/decks/archetypes', function () {
@@ -190,8 +197,9 @@ Route::get('/decks/archetypes', function () {
 
 Route::get('/decks/known-archetypes', [DeckController::class, 'knownArchetypes']);
 
-
-Route::delete('/decks/{id}', [DeckController::class, 'destroy']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::delete('/decks/{id}', [DeckController::class, 'destroy']);
+});
 
 // Collections support
 Route::delete('/collections/{id}', [CollectionManagementController::class, 'destroy']);

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use App\Enums\Visibility;
 use App\Models\CollectedCardsFromSets;
 use App\Models\CollectionOwner;
 use App\Models\SetsInCollection;
@@ -41,5 +42,10 @@ class CollectionManagement extends Model
         'owner_id',
         'collection_name',
         'description',
+        'visibility',
+    ];
+
+    protected $casts = [
+        'visibility' => Visibility::class,
     ];
 }

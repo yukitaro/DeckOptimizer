@@ -9,10 +9,25 @@ use Illuminate\Notifications\Notifiable;
 
 use Laravel\Sanctum\HasApiTokens;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+use App\Models\CollectionManagement;
+use App\Models\DeckManagement;
+
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
      use HasApiTokens, Notifiable, HasFactory;
+
+    public function ownedDecks(): HasMany
+    {
+        return $this->hasMany(DeckManagement::class, 'deck_owner_id');
+    }
+
+    public function ownedCollections(): HasMany
+    {
+        return $this->hasMany(CollectionManagement::class, 'owner_id');
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -23,6 +38,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'alias',
     ];
 
     /**
