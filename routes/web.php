@@ -13,6 +13,9 @@ use App\Models\CollectionManagement;
 use App\Models\DeckManagement;
 use App\Models\SetData;
 
+use Laravel\Sanctum\Http\Controllers\CsrfCookieController;
+
+Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
 
 Route::get('/', function () {
     return view('welcome');

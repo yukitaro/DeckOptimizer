@@ -3,6 +3,8 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\CollectedCardsImportController;
@@ -21,10 +23,11 @@ use App\Models\CardsInDeck;
 use App\Models\CollectedCardsFromSets;
 use App\Models\CollectionManagement;
 use App\Models\DeckManagement;
-use App\Models\SetData;
+use App\Models\InvitationToken;
 use App\Models\MtgImageLookup;
 use App\Models\MtgJsonImportCandidate;
 use App\Models\MtgDeckBoardGroups;
+use App\Models\SetData;
 use App\Models\SetsInCollection;
 use App\Models\User;
 
@@ -530,4 +533,77 @@ Route::post('/login', function (Request $request) {
         'token' => $user->createToken('deckoptimizer')->plainTextToken,
         'user' => $user,
     ]);
+});
+
+Route::post('/register', function (Request $request) {
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'alias' => 'nullable|string|max:255',
+        'email' => 'required|email|unique:users,email',
+        'password' => 'required|string|min:6|confirmed',
+    ]);
+
+    $invitation = InvitationToken::where('token', $request->invitation_token)
+        ->where('used', false)
+        ->where('expires_at', '>', now())
+        ->firstOrFail();
+
+    $user = User::create([
+        'name' => $request->name,
+        'alias' => $request->alias,
+        'email' => $request->email,
+        'password' => Hash::make($request->password),
+    ]);
+
+    if ($user) {
+        $invitation->used = true;
+        $invitation->save();
+    }
+
+    return response()->json([
+        'token' => $user->createToken('deckoptimizer')->plainTextToken,
+        'user' => $user,
+    ]);
+});
+
+Route::post('/forgot-password', function (Request $request) {
+    $request->validate(['email' => 'required|email']);
+
+    $status = Password::sendResetLink(
+        $request->only('email')
+    );
+
+    if ($status !== Password::RESET_LINK_SENT) {
+        Log::info('Password reset link request skipped', [
+            'status' => $status,
+            'email_hash' => hash('sha256', strtolower((string) $request->input('email'))),
+            'timestamp' => now()->toIso8601String(),
+        ]);
+    }
+
+    return response()->json([
+        'status' => __('passwords.sent'),
+    ]);
+});
+
+
+Route::post('/reset-password', function (Request $request) {
+    $request->validate([
+        'token' => 'required',
+        'email' => 'required|email',
+        'password' => 'required|min:8|confirmed',
+    ]);
+
+    $status = Password::reset(
+        $request->only('email', 'password', 'password_confirmation', 'token'),
+        function ($user, $password) {
+            $user->forceFill([
+                'password' => Hash::make($password)
+            ])->save();
+        }
+    );
+
+    return $status === Password::PASSWORD_RESET
+        ? response()->json(['status' => __($status)])
+        : response()->json(['error' => __($status)], 400);
 });

@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Models\InvitationToken;
-use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+
+use App\Http\Controllers\Controller;
+use App\Models\InvitationToken;
+use App\Models\User;
 
 class InviteRegistrationController extends Controller
 {

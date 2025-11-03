@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -13,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 use App\Models\CollectionManagement;
 use App\Models\DeckManagement;
+use App\Notifications\PasswordResetLink;
 
 class User extends Authenticatable
 {
@@ -27,6 +27,11 @@ class User extends Authenticatable
     public function ownedCollections(): HasMany
     {
         return $this->hasMany(CollectionManagement::class, 'owner_id');
+    }
+
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new PasswordResetLink($token));
     }
 
     /**
