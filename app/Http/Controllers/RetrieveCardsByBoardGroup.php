@@ -54,7 +54,7 @@ class RetrieveCardsByBoardGroup extends Controller
                     return null;
                 }
 
-                \Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
+                //\Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
 
                 $imageLookup = MtgImageLookup::where('card_uuid', $sourceCard->card_uuid)->first();
                 $imageUrl = $imageLookup->canonical_image_url
@@ -70,6 +70,9 @@ class RetrieveCardsByBoardGroup extends Controller
                     'scryfall_id' => $meta->scryfallId ?? null,
                     'type' => $sourceCard->type,
                     'card_count' => $cardInDeck->card_count,
+                    'slug' => $sourceCard->slug,
+                    'set_name' => $sourceCard->set_name,
+                    'number_in_set' => $sourceCard->number_in_set,
                 ];
             });
 

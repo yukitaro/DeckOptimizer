@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\AdminPermissionController;
+use App\Http\Controllers\AdminRoleController;
+use App\Http\Controllers\AdminUserController;
+
 use App\Http\Controllers\CollectedCardsImportController;
 use App\Http\Controllers\CollectionManagementController;
 use App\Http\Controllers\DashboardController;
@@ -33,8 +37,21 @@ use App\Models\User;
 
 Route::get('/health', fn() => response()->json(['status' => 'ok']));
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+/* Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
+});
+ */
+
+Route::middleware('auth:sanctum')->get('/user', function () {
+    $user = auth()->user();
+
+    if (!$user) {
+        \Log::error('No authenticated user found');
+        return response()->json(['error' => 'Unauthenticated'], 401);
+    }
+
+    \Log::debug('Authenticated user:', ['id' => $user->id, 'email' => $user->email]);
+    return response()->json($user);
 });
 
 Route::post('/cardsInDeck/{deck_id}/boardgroups/{board_groups}', [RetrieveCardsByBoardGroup::class, 'getCardsByBoardGroup']);
@@ -73,7 +90,7 @@ Route::get('/cardsInDeck/{deck_id}', function ($deck_id) {
              return null;
          }
  
-         \Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
+         //\Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
          if (!$meta || !$set) return null;
  
          $card->name = $meta->name;
@@ -141,7 +158,7 @@ Route::get('/sideboard/{deck_id}', function ($deck_id) {
              return null;
          }
  
-         \Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
+         //\Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
          if (!$meta || !$set) return null;
  
          $card->name = $meta->name;
@@ -325,8 +342,8 @@ Route::post('/report-broken-images', function (Request $request) {
     ]);
 });
 
-Route::get('/collections', function () {
-    $collections = CollectionManagement::with(['setsInCollection.collectedCards'])->get();
+Route::middleware('auth:sanctum')->get('/collections', function () {
+    $collections = CollectionManagement::with(['setsInCollection.collectedCards'])->where('owner_id', auth()->id())->get();
 
     return $collections->map(function ($collection) {
 
@@ -351,7 +368,8 @@ Route::get('/collections', function () {
 });
 
 
-Route::post('/collections/create', function (Request $request) {
+Route::middleware('auth:sanctum')->post('/collections/create', function (Request $request) {
+    \Log::debug('Authenticated user ID:', ['id' => auth()->id()]);
     $name = $request->input('name');
     $description = $request->input('description', '');
     
@@ -359,10 +377,10 @@ Route::post('/collections/create', function (Request $request) {
         return response()->json(['error' => 'Collection name is required'], 400);
     }
     
-    $collection = new \App\Models\CollectionManagement();
+    $collection = new CollectionManagement();
     $collection->collection_name = $name;
     $collection->description = $description;
-    $collection->owner_id = 1;
+    $collection->owner_id = auth()->id();
     $collection->save();
     
     return response()->json([
@@ -378,9 +396,8 @@ Route::get('/collections/{id}/import-status', function ($id) {
     return response()->json(['status' => $collection->import_status]);
 });
 
-
-Route::get('/collections/{collection_id}/cards', function (Request $request, $collection_id) {
-    $collection = CollectionManagement::find($collection_id);
+Route::middleware('auth:sanctum')->get('/collections/{collection_id}/cards', function (Request $request, $collection_id) {
+    $collection = CollectionManagement::where('owner_id', auth()->id())->where('id', $collection_id)->first();
 
     if (!$collection) {
         return response()->json(['error' => 'Collection not found'], 404);
@@ -407,30 +424,67 @@ Route::get('/collections/{collection_id}/cards', function (Request $request, $co
     ]);
 });
 
-Route::post('/inventory/lookup-normalized', function (Request $request) {
+Route::middleware('auth:sanctum')->post('/inventory/lookup-normalized', function (Request $request) {
     $names = $request->input('card_names', []);
-    $collectionIds = $request->input('collection_ids', []);
-    $collectionIds = Arr::flatten($collectionIds);
-    
-    $setIds = SetsInCollection::whereIn('collection_management_id', $collectionIds)->pluck('id');
+    $collectionIds = Arr::flatten($request->input('collection_ids', []));
 
-    // Find cards directly by name in the cardFromSet relationship
-    $cards = CollectedCardsFromSets::whereIn('set_in_collection_id', $setIds)
-        ->whereHas('cardFromSet', function ($q) use ($names) {
-            $q->whereIn('name', $names);
+    if (empty($names) || empty($collectionIds)) {
+        return response()->json(['error' => 'Missing card names or collection IDs'], 422);
+    }
+
+    $ownedCollectionIds = CollectionManagement::whereIn('id', $collectionIds)
+        ->where('owner_id', auth()->id())
+        ->pluck('id');
+
+    if ($ownedCollectionIds->isEmpty()) {
+        return response()->json(['error' => 'No matching collections found for this user'], 403);
+    }
+
+    $setIds = SetsInCollection::whereIn('collection_management_id', $ownedCollectionIds)->pluck('id');
+
+    // ✅ Step 1: Match normalized names
+    $normalizedMatches = CardDataNormalized::query()
+        ->where(function ($q) use ($names) {
+            foreach ($names as $name) {
+                $q->orWhereRaw('LOWER(normalized_name) LIKE ?', ['%' . strtolower($name) . '%']);
+            }
         })
+        ->get();
+
+    // ✅ Step 2: Resolve canonical names
+    $canonicalNames = CardDataFromSetData::whereIn(
+        'id',
+        $normalizedMatches->pluck('source_printing_id')->filter()->unique()
+    )->pluck('name')->unique();
+
+    // ✅ Step 3: Get all printings with those names
+    $allMatchingPrintings = CardDataFromSetData::whereIn('name', $canonicalNames)->pluck('id');
+
+    // ✅ Step 4: Get collected cards matching those printings
+    $cards = CollectedCardsFromSets::query()
+        ->whereIn('set_in_collection_id', $setIds)
+        ->whereIn('card_data_id', $allMatchingPrintings)
         ->with('cardFromSet')
         ->get();
 
-    \Log::info('Found cards count: ' . $cards->count());
+    // ✅ Step 5: Group by normalized name
+    $grouped = $normalizedMatches->map(function ($normalized) use ($cards) {
+        $canonicalName = CardDataFromSetData::find($normalized->source_printing_id)?->name;
 
-    // Group by the actual card name from the cardFromSet relationship
-    $grouped = $cards->groupBy(fn($card) => $card->cardFromSet->name)
-        ->map(fn($group, $name) => [
-            'name' => $name,
-            'total_count' => $group->sum('card_count'),
-            'variants' => $group
-        ]);
+        $matchingCards = $cards->filter(fn($card) => 
+            $card->cardFromSet->name === $canonicalName
+        );
+
+        return [
+            'name' => $normalized->normalized_name,
+            'total_count' => $matchingCards->sum('card_count'),
+            'variants' => $matchingCards->map(fn($variant) => [
+                'set_in_collection_id' => $variant->set_in_collection_id,
+                'card_count' => $variant->card_count,
+                'card_from_set' => $variant->cardFromSet,
+            ]),
+        ];
+    })->filter(fn($entry) => $entry['total_count'] > 0);
 
     return response()->json($grouped->values());
 });
@@ -607,3 +661,15 @@ Route::post('/reset-password', function (Request $request) {
         ? response()->json(['status' => __($status)])
         : response()->json(['error' => __($status)], 400);
 });
+
+Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/admin/users', function () {
+        return User::with('roles')->get();
+    });
+
+    Route::get('/admin/roles', [AdminRoleController::class, 'index']);
+    Route::get('/admin/permissions', [AdminPermissionController::class, 'index']);
+    Route::post('/admin/users/{user}/roles', [AdminUserController::class, 'assignRoles']);
+    Route::post('/admin/roles/{role}/permissions', [AdminRoleController::class, 'assignPermissions']);
+});
+

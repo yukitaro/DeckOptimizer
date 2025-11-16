@@ -30,6 +30,7 @@ services:
       - /mnt/user/appdata/deckoptimizer/storage:/var/www/html/storage
       - /mnt/user/appdata/deckoptimizer/bootstrap-cache:/var/www/html/bootstrap/cache
       - /mnt/user/appdata/deckoptimizer/supervisor:/tmp/supervisor
+      - /mnt/user/appdata/deckoptimizer/.env.production:/var/www/html/.env
     networks:
       - deckoptimizer-network
     healthcheck:

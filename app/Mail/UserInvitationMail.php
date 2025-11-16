@@ -38,10 +38,11 @@ class UserInvitationMail extends Mailable
      */
     public function content(): Content
     {
+        $url = rtrim(config('app.frontend_url'), '/') . '/register?token=' . urlencode($this->invitation->token);
         return new Content(
             view: 'emails.invitation',
             with: [
-                'link' => url("/register?token={$this->invitation->token}"),
+                'link' => $url, //url("/register?token={$this->invitation->token}"),
                 'expires' => $this->invitation->expires_at,
             ],
         );

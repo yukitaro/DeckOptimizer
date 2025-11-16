@@ -10,7 +10,6 @@ use App\DTOs\DeckImportDTO;
 use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
 use App\Models\DeckManagement;
-use App\Models\DeckOwner;
 use App\Models\MtgArchetype;
 use App\Models\User;
 
@@ -162,7 +161,8 @@ class DeckController extends Controller
         ]);
     }
 
-    public function storeFromDTO(DeckImportDTO $dto, DeckOwner $owner)
+    // I'm not sure what I made this for. 
+    public function storeFromDTO(DeckImportDTO $dto, User $owner)
     {
         $deck = $owner->ownedDecks()->create([
             'deck_name' => $dto->name,
@@ -265,7 +265,7 @@ class DeckController extends Controller
         $deck->cardsInDeck()->delete();
 
         // Delete owner record
-        $deck->deckOwner()->delete();
+        //$deck->deckOwner()->delete();
 
         // Delete the deck itself
         $deck->delete();

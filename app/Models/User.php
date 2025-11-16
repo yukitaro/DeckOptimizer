@@ -34,6 +34,27 @@ class User extends Authenticatable
         $this->notify(new PasswordResetLink($token));
     }
 
+    public function roles() {
+        return $this->belongsToMany(Role::class);
+    }
+
+    public function hasRole($roleName) {
+        return $this->roles->contains('name', $roleName);
+    }
+
+    public function hasPermission($permissionName) {
+        return $this->roles->flatMap->permissions->contains('name', $permissionName);
+    }
+
+    public function isSuperuser() {
+        return $this->is_superuser === true;
+    }
+
+    public function permissions()
+    {
+        return $this->hasManyThrough(Permission::class, Role::class);
+    }
+
     /**
      * The attributes that are mass assignable.
      *
@@ -44,6 +65,7 @@ class User extends Authenticatable
         'email',
         'password',
         'alias',
+        'is_superuser'
     ];
 
     /**
