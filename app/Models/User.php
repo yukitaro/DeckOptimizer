@@ -55,6 +55,14 @@ class User extends Authenticatable
         return $this->hasManyThrough(Permission::class, Role::class);
     }
 
+    // User.php
+    public function delegatedCollections()
+    {
+        return $this->belongsToMany(CollectionManagement::class)
+            ->withPivot('can_edit')
+            ->withTimestamps();
+    }
+
     /**
      * The attributes that are mass assignable.
      *

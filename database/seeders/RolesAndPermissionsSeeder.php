@@ -10,19 +10,34 @@ class RolesAndPermissionsSeeder extends Seeder
 {
     public function run()
     {
-        $permissions = collect(config('permissions'))
+        $permissionGroups = config('permissions');
+
+        // Flatten and create all permissions
+        $allPermissions = collect($permissionGroups)
             ->flatten()
             ->unique()
             ->map(fn($name) => Permission::firstOrCreate(['name' => $name]));
 
-        $admin = Role::firstOrCreate(['name' => 'admin']);
-        $editor = Role::firstOrCreate(['name' => 'editor']);
-        $viewer = Role::firstOrCreate(['name' => 'viewer']);
+        // Create roles
+        $roles = [
+            'admin' => ['*'], // gets all permissions
+            'editor' => [
+                'view_issues', 'edit_issues', 'create_issues',
+                'view_users', 'view_roles',
+            ],
+            'viewer' => [
+                'view_issues', 'view_users', 'view_roles',
+            ],
+        ];
 
-        $admin->permissions()->sync(Permission::pluck('id'));
-        $editor->permissions()->sync(Permission::whereIn('name', [
-            'view_issues', 'edit_issues', 'create_issues'
-        ])->pluck('id'));
-        $viewer->permissions()->sync(Permission::where('name', 'like', 'view_%')->pluck('id'));
+        foreach ($roles as $roleName => $grantedPermissions) {
+            $role = Role::firstOrCreate(['name' => $roleName]);
+
+            $permissionIds = $grantedPermissions === ['*']
+                ? Permission::pluck('id')
+                : Permission::whereIn('name', $grantedPermissions)->pluck('id');
+
+            $role->permissions()->sync($permissionIds);
+        }
     }
 }

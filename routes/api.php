@@ -43,7 +43,7 @@ Route::get('/health', fn() => response()->json(['status' => 'ok']));
  */
 
 Route::middleware('auth:sanctum')->get('/user', function () {
-    $user = auth()->user();
+    $user = auth()->user()->load('roles.permissions');
 
     if (!$user) {
         \Log::error('No authenticated user found');

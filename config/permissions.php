@@ -1,18 +1,16 @@
 <?php
 
 return [
-    'issues' => [
-        'view_issues',
-        'create_issues',
-        'edit_issues',
-        'delete_issues',
-    ],
-    'users' => [
-        'assign_roles',
-        'view_users',
-    ],
-    'roles' => [
-        'assign_permissions',
-        'view_roles',
-    ],
+    'adminConsole' => ['view_admin_console'],
+    'roleManagement' => ['manage_roles'],
+    'permissionMatrix' => ['assign_permissions'],
+    'mtgImport' => ['manage_import_candidates'],
+    'mtgSetData' => ['view_set_data'],
+    'cardMetadata' => ['view_card_metadata'],
+
+    // Optional: legacy or shared permissions
+    'issues' => ['view_issues', 'create_issues', 'edit_issues', 'delete_issues'],
+    'users' => ['view_users', 'assign_roles'],
+    'roles' => ['view_roles'],
 ];
+

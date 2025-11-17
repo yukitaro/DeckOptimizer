@@ -26,6 +26,14 @@ class CollectionManagement extends Model
         return $this->hasMany(SetsInCollection::class, 'collection_management_id');
     }
 
+    public function delegates()
+    {
+        return $this->belongsToMany(User::class)
+            ->withPivot('can_edit')
+            ->withTimestamps();
+    }
+
+
     public function cardsInCollection(): HasManyThrough
     {
         return $this->hasManyThrough(
