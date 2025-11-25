@@ -55,13 +55,42 @@ class User extends Authenticatable
         return $this->hasManyThrough(Permission::class, Role::class);
     }
 
-    // User.php
     public function delegatedCollections()
     {
         return $this->belongsToMany(CollectionManagement::class)
             ->withPivot('can_edit')
             ->withTimestamps();
     }
+
+    public function canEditCollection(CollectionManagement $collection): bool
+    {
+        return $this->id === $collection->owner_id ||
+            $this->delegatedCollections()
+                ->where('collection_management_id', $collection->id)
+                ->wherePivot('can_edit', true)
+                ->exists();
+    }
+
+
+    public function canViewCollection(CollectionManagement $collection): bool
+    {
+        return $this->id === $collection->owner_id ||
+            $this->delegatedCollections()
+                ->where('collection_management_id', $collection->id)
+                ->wherePivot('can_view', true)
+                ->exists();
+    }
+    
+
+    public function canShareCollection(CollectionManagement $collection): bool
+    {
+        return $this->id === $collection->owner_id ||
+            $this->delegatedCollections()
+                ->where('collection_management_id', $collection->id)
+                ->wherePivot('can_share', true)
+                ->exists();
+    }    
+
 
     /**
      * The attributes that are mass assignable.
@@ -96,6 +125,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_superuser' => 'boolean'
         ];
     }
 }

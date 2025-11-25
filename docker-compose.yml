@@ -9,8 +9,8 @@ services:
         - ./frontend:/app
     laravel.test:
         build:
-            context: './docker/8.4'
-            dockerfile: Dockerfile
+            context: './vendor/laravel/sail/runtimes/8.4'
+            dockerfile: Dockerfile #docker/8.4/Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP}'
         image: 'sail-8.4/app'
@@ -71,6 +71,15 @@ services:
             sail:
                 aliases:
                     - puppeteer            
+    redis:
+        image: redis:7-alpine
+        command: ["redis-server", "--save", "", "--appendonly", "no"]
+        ports:
+        - "6379:6379"
+        volumes:
+        - redis_data:/data
+        networks:
+        - sail
 
 networks:
     sail:
@@ -78,3 +87,4 @@ networks:
 
 volumes:
   puppeteer_node_modules:
+  redis_data:

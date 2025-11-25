@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 use App\Enums\Visibility;
-use App\Models\DeckOwner;
 use App\Models\CardDataNormalized;
 use App\Models\CardsInDeck;
 use App\Models\MtgArchetype;
@@ -20,11 +19,6 @@ use Laravel\Sanctum\HasApiTokens;
 class DeckManagement extends Model
 {
     protected $table = 'deck_management';
-
-    public function deckOwner() : HasOne
-    {
-        return $this->hasOne(DeckOwner::class, 'deck_id');
-    }
 
     public function cardsInDeck(): HasMany
     {

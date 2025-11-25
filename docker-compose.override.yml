@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  laravel.test:
+    build:
+      context: ./docker/dev
+      dockerfile: Dockerfile.dev
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sail
+
+volumes:
+  redis_data:

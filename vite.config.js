@@ -11,7 +11,10 @@ export default defineConfig({
             host: "0.0.0.0"
         },
         port:5173,
-        host:true
+        host:true,
+        proxy: {
+            '/api': 'http://localhost:9000'
+        }
     },
     plugins: [
         vue({

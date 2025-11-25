@@ -12,5 +12,6 @@ return [
     'issues' => ['view_issues', 'create_issues', 'edit_issues', 'delete_issues'],
     'users' => ['view_users', 'assign_roles'],
     'roles' => ['view_roles'],
+    'enums' => ['manage_enums'],
 ];
 

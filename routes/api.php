@@ -16,6 +16,9 @@ use App\Http\Controllers\CollectionManagementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeckController;
 use App\Http\Controllers\DeckScrapersController;
+use App\Http\Controllers\EnumController;
+use App\Http\Controllers\IssueController;
+use App\Http\Controllers\IssueEnumController;
 use App\Http\Controllers\MtgBulkPriceController;
 use App\Http\Controllers\RetrieveCardsByBoardGroup;
 
@@ -50,7 +53,7 @@ Route::middleware('auth:sanctum')->get('/user', function () {
         return response()->json(['error' => 'Unauthenticated'], 401);
     }
 
-    \Log::debug('Authenticated user:', ['id' => $user->id, 'email' => $user->email]);
+    //\Log::debug('Authenticated user:', ['id' => $user->id, 'email' => $user->email]);
     return response()->json($user);
 });
 
@@ -671,5 +674,26 @@ Route::middleware('auth:sanctum')->group(function() {
     Route::get('/admin/permissions', [AdminPermissionController::class, 'index']);
     Route::post('/admin/users/{user}/roles', [AdminUserController::class, 'assignRoles']);
     Route::post('/admin/roles/{role}/permissions', [AdminRoleController::class, 'assignPermissions']);
+});
+
+/* Route::middleware('auth:sanctum')->group(function() {
+    Route::get('')
+});
+ */
+
+Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/enums', [EnumController::class, 'index']);
+    Route::get('/issues/enums', [IssueEnumController::class, 'index']);
+    Route::post('/admin/enums/{domain}', [EnumController::class, 'store'])->middleware('can:manage_enums');
+    Route::post('/admin/issue-types', [IssueEnumController::class, 'store'])->middleware('can:manage_issue_types');
+});
+
+
+Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/issues', [IssueController::class, 'index']);
+    Route::post('/issues', [IssueController::class, 'store']);
+    Route::get('/issues/{id}', [IssueController::class, 'show']);
+    Route::put('/issues/{id}', [IssueController::class, 'update']);
+    Route::delete('/issues/{id}', [IssueController::class, 'destroy']);
 });
 

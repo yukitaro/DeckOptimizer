@@ -1,0 +1,11 @@
+# Start from the Sail PHP 8.4 image
+FROM sail-8.4/app
+
+# Install Redis extension
+RUN apt-get update && apt-get install -y \
+      php8.4-redis \
+      php8.4-bz2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Optional: confirm extension is enabled
+RUN php -m | grep redis

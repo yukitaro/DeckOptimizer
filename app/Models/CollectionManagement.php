@@ -5,12 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 use App\Enums\Visibility;
 use App\Models\CollectedCardsFromSets;
 use App\Models\CollectionOwner;
 use App\Models\SetsInCollection;
-
+use App\Models\User;
 
 class CollectionManagement extends Model
 {
@@ -29,10 +30,18 @@ class CollectionManagement extends Model
     public function delegates()
     {
         return $this->belongsToMany(User::class)
-            ->withPivot('can_edit')
+            ->withPivot(['can_view', 'can_edit', 'can_share', 'granted_at', 'granted_by'])
             ->withTimestamps();
     }
 
+    public function isEditableBy(User $user): bool
+    {
+        return $this->owner_id === $user->id ||
+            $this->delegates()
+                ->where('user_id', $user->id)
+                ->wherePivot('can_edit', true)
+                ->exists();
+    }    
 
     public function cardsInCollection(): HasManyThrough
     {

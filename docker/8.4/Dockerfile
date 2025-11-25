@@ -30,9 +30,11 @@ RUN curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php \
 COPY composer.json composer.lock ./
 COPY . .
 
+
 # Run composer with the full repo available (path repositories resolved)
-RUN composer install --prefer-dist --no-dev --no-interaction --no-scripts --no-autoloader \
+RUN composer install --prefer-dist --no-dev --no-interaction --no-scripts \
   && composer dump-autoload --optimize --no-dev
+
 
 # Optional frontend build (uncomment if you build assets here)
 # RUN cd frontend && yarn install --frozen-lockfile && yarn build
@@ -54,6 +56,7 @@ RUN apk add --no-cache --virtual .build-deps \
       libpng-dev \
       libjpeg-turbo-dev \
       freetype-dev \
+      bzip2-dev \
       linux-headers \
     && apk add --no-cache \
       mysql-client \
@@ -65,14 +68,17 @@ RUN apk add --no-cache --virtual .build-deps \
       freetype \
       bash \
       curl \
+      bzip2 \
     && docker-php-ext-configure gd --with-jpeg --with-freetype \
     && docker-php-ext-configure zip \
     && docker-php-ext-install -j"$(getconf _NPROCESSORS_ONLN)" pdo pdo_mysql zip gd \
+    && pecl install redis \
+    && docker-php-ext-enable redis bz2 \
     && apk del .build-deps
 
 # Copy app + vendor from builder
-COPY --from=builder /app /var/www/html
 COPY --from=builder /app/vendor /var/www/html/vendor
+COPY --from=builder /app /var/www/html
 
 # Runtime configuration and lightweight entrypoint
 COPY docker/8.4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

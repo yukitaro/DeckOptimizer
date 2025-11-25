@@ -20,6 +20,7 @@ class AdminRoleController extends Controller
     }
 
     public function assignPermissions(Request $request, Role $role) {
+        
         $this->authorize('update', $role); // Or gate by 'assign_permissions'
         $role->permissions()->sync($request->input('permission_ids'));
         return response()->json(['status' => 'updated']);

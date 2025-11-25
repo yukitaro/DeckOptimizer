@@ -2,7 +2,7 @@
 
 namespace App\Policies;
 
-use App\Models\Issue;
+use App\Models\DeckOptimizerIssues as Issue;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 

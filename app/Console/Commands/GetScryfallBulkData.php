@@ -7,25 +7,21 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 use GuzzleHttp\Client;
-
 use App\Models\MtgBulkPrices;
-
+use JsonMachine\Items;
 
 class GetScryfallBulkData extends Command
 {
     protected $signature = 'scryfall:get-and-import-bulk-data';
     protected $description = 'Download and import bulk pricing data from Scryfall';
 
-    /**
-     * Execute the console command.
-     */
     public function handle()
     {
         $this->info('Checking Scryfall bulk data index...');
         $bulkList = Http::get('https://api.scryfall.com/bulk-data')->json()['data'];
         $defaultDump = collect($bulkList)->firstWhere('type', 'default_cards');
         $downloadUri = $defaultDump['download_uri'];
-        $expectedFilename = basename($downloadUri); // e.g. default-cards-2025-10-06.json
+        $expectedFilename = basename($downloadUri);
 
         $alreadyImported = DB::table('scryfall_imports')
             ->where('filename', $expectedFilename)
@@ -37,16 +33,11 @@ class GetScryfallBulkData extends Command
         }
 
         $localPath = storage_path("app/scryfall/{$expectedFilename}");
-
-        // Ensure directory exists
         if (!file_exists(dirname($localPath))) {
             mkdir(dirname($localPath), 0755, true);
         }
 
-        // Skip download if file already exists
-        if (file_exists($localPath)) {
-            $this->info("Bulk file already exists: {$expectedFilename}. Skipping download.");
-        } else {
+        if (!file_exists($localPath)) {
             $client = new Client();
             $client->request('GET', $downloadUri, [
                 'sink' => $localPath,
@@ -54,9 +45,7 @@ class GetScryfallBulkData extends Command
             ]);
         }
 
-        if (file_exists($localPath)) {
-            $this->info("✅ File downloaded successfully: {$localPath}");
-        } else {
+        if (!file_exists($localPath)) {
             $this->error("❌ File not found after download attempt.");
             return;
         }
@@ -68,12 +57,13 @@ class GetScryfallBulkData extends Command
             }
         }
 
-
         $this->info("Parsing and importing prices...");
-        $cards = json_decode(file_get_contents($localPath), true);
+        $stream = Items::fromFile($localPath);
         $count = 0;
 
-        foreach ($cards as $card) {
+        foreach ($stream as $card) {
+            $card = $this->toArrayRecursive($card);
+
             if (!isset($card['oracle_id'])) {
                 continue;
             }
@@ -98,12 +88,25 @@ class GetScryfallBulkData extends Command
                 $this->info("Imported $count cards...");
             }
         }
-        
+
         DB::table('scryfall_imports')->insert([
             'filename' => $expectedFilename,
             'imported_at' => now(),
         ]);
 
         $this->info("Done. Imported $count cards.");
+    }
+
+    private function toArrayRecursive($data)
+    {
+        if (is_object($data)) {
+            $data = (array) $data;
+        }
+        if (is_array($data)) {
+            foreach ($data as $key => $value) {
+                $data[$key] = $this->toArrayRecursive($value);
+            }
+        }
+        return $data;
     }
 }
