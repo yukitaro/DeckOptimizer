@@ -73,7 +73,7 @@ RUN apk add --no-cache --virtual .build-deps \
     && docker-php-ext-configure zip \
     && docker-php-ext-install -j"$(getconf _NPROCESSORS_ONLN)" pdo pdo_mysql zip gd \
     && pecl install redis \
-    && docker-php-ext-enable redis bz2 \
+    && docker-php-ext-enable redis \
     && apk del .build-deps
 
 # Copy app + vendor from builder

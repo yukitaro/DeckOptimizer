@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Casts\JsonToArray;
 use App\Models\CardDataFromSetData;
 
 class CardMetadata extends Model
@@ -15,7 +16,7 @@ class CardMetadata extends Model
     }
 
     protected $casts = [
-        'purchaseUrls' => 'array',
+        'purchaseUrls' => JsonToArray::class,
         'identifiers' => 'array',        
         'normalized_attributes' => 'array',
     ];

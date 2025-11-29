@@ -40,11 +40,6 @@ use App\Models\User;
 
 Route::get('/health', fn() => response()->json(['status' => 'ok']));
 
-/* Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
- */
-
 Route::middleware('auth:sanctum')->get('/user', function () {
     $user = auth()->user()->load('roles.permissions');
 
@@ -53,9 +48,46 @@ Route::middleware('auth:sanctum')->get('/user', function () {
         return response()->json(['error' => 'Unauthenticated'], 401);
     }
 
-    //\Log::debug('Authenticated user:', ['id' => $user->id, 'email' => $user->email]);
     return response()->json($user);
 });
+
+Route::get('/sets/{cardminimum?}', function (int $cardminimum = 85) {
+    return SetData::where('total_cards', '>', $cardminimum)
+    ->get();
+});
+
+Route::get('/cards/name/{name}/rarities/{rarities?}', function (string $name, string $rarities = '') {
+    $limit = request('limit');
+
+    if ($rarities === '') {
+        $rarities = "common,uncommon,rare,mythic";
+    }
+
+    return CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
+    ->where('name', 'LIKE', "%{$name}%")
+    ->limit($limit)
+    ->get();
+});
+
+Route::get('/cardsfromsets/{setnames}/{rarities?}', function (string $setnames, string $rarities = '') {
+    $limit = request('limit');
+    $colorFilters = request('colorFilters');
+
+    if ($rarities === '') {
+        $rarities = "common,uncommon,rare,mythic";
+    }
+
+    $query = CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
+        ->whereIn('set_name', explode(',', "$setnames"));
+
+    // Only apply color filtering if colorFilters is provided and not empty
+    if ($colorFilters && $colorFilters !== '') {
+        $query->whereIn('colors', explode(',', $colorFilters));
+    }
+
+    return $query->limit($limit)->get();
+});
+
 
 Route::post('/cardsInDeck/{deck_id}/boardgroups/{board_groups}', [RetrieveCardsByBoardGroup::class, 'getCardsByBoardGroup']);
 
@@ -349,11 +381,9 @@ Route::middleware('auth:sanctum')->get('/collections', function () {
     $collections = CollectionManagement::with(['setsInCollection.collectedCards'])->where('owner_id', auth()->id())->get();
 
     return $collections->map(function ($collection) {
-
         $totalCards = $collection->setsInCollection
             ->flatMap(fn($set) => $set->collectedCards)
             ->sum('card_count');
-
 
         $total_unique_cards = $collection->setsInCollection->sum(function ($set) {
             return $set->collectedCards->count();

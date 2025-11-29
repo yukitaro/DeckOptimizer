@@ -24,66 +24,9 @@ Route::get('/', function () {
 
 Route::get('/cards/{num_cards}', [CardDataController::class, 'retrieve']);
 
-/*Route::get('/cardsJSON/{num_cards}', function (int $num_cards) {
-    $matching_cards = CardData::where('rarity', 'common')
-    ->limit($num_cards)
-    ->get();
-
-    return $matching_cards;
-});*/
-
 Route::get('/sets/{cardminimum?}', function (int $cardminimum = 85) {
     return SetData::where('total_cards', '>', $cardminimum)
     ->get();
-});
-
-Route::get('/cards/name/{name}/rarities/{rarities?}', function (string $name, string $rarities) {
-
-    $limit = request('limit');
-
-    if ($rarities === '') {
-        $rarities = "common,uncommon,rare,mythic";
-    }
-
-    //return CardData::whereIn('rarity', explode(',', $rarities))
-    return CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
-    ->where('name', 'LIKE', "%{$name}%")
-    ->limit($limit)
-    ->get();
-});
-
-Route::get('/cardsfromsets/name/{name}/rarities/{rarities?}', function (string $name, string $rarities) {
-
-    $limit = request('limit');
-
-    if ($rarities === '') {
-        $rarities = "common,uncommon,rare,mythic";
-    }
-
-    return CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
-    ->where('name', 'LIKE', "%{$name}%")
-    ->limit($limit)
-    ->get();
-});
-
-Route::get('/cardsfromsets/{setnames}/{rarities?}', function (string $setnames, string $rarities = '') {
-
-    $limit = request('limit');
-    $colorFilters = request('colorFilters');
-
-    if ($rarities === '') {
-        $rarities = "common,uncommon,rare,mythic";
-    }
-
-    $query = CardDataFromSetData::whereIn('rarity', explode(',', $rarities))
-        ->whereIn('set_name', explode(',', "$setnames"));
-
-    // Only apply color filtering if colorFilters is provided and not empty
-    if ($colorFilters && $colorFilters !== '') {
-        $query->whereIn('colors', explode(',', $colorFilters));
-    }
-
-    return $query->limit($limit)->get();
 });
 
 Route::get('/cardsJSON/{num_cards}/{colors?}', function (int $num_cards, string $colors = 'W') {

@@ -25,6 +25,8 @@ services:
       DB_PASSWORD: '${DB_PASSWORD}'
       CORS_ALLOWED_ORIGINS: '${CORS_ALLOWED_ORIGINS}'
       PUPPETEER_SERVICE_URL: '${PUPPETEER_SERVICE_URL}'
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       LARAVEL_SAIL: 1
     volumes:
       - /mnt/user/appdata/deckoptimizer/storage:/var/www/html/storage
@@ -38,9 +40,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   mysql:
@@ -69,6 +72,22 @@ services:
     command:
       - --default-authentication-plugin=mysql_native_password
       - --max_allowed_packet=256M
+
+  redis:
+    image: redis:7-alpine
+    container_name: deckoptimizer-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - /mnt/user/appdata/deckoptimizer/redis:/data
+    networks:
+      - deckoptimizer-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   puppeteer:
     build:

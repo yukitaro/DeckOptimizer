@@ -33,8 +33,11 @@ class MtgBulkPriceController extends Controller
             $records = [];
 
             foreach ($printings as $printing) {
-                $scryfallId = optional(json_decode($printing->cardMetadata->identifiers))->scryfallId;
-                $tcgPlayerPurchaseUrl = optional(json_decode($printing->cardMetadata->purchaseUrls))->tcgplayer;
+                $scryfallId = $printing->cardMetadata->identifiers['scryfallId'] ?? null;
+
+                $purchaseUrls = $printing->cardMetadata->purchaseUrls ?? [];
+
+                $tcgPlayerPurchaseUrl = $purchaseUrls['tcgplayer'] ?? null;
                 if (!$scryfallId) continue;
 
                 $bulk = MtgBulkPrices::where('scryfall_id', $scryfallId)->first();

@@ -216,10 +216,51 @@ CREATE TABLE `collection_management` (
   `collection_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `owner_id` bigint unsigned NOT NULL,
+  `visibility` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'private',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `import_status` enum('pending','processing','complete','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `collection_management_owner_id_foreign` (`owner_id`),
+  CONSTRAINT `collection_management_owner_id_foreign` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `collection_management_user`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `collection_management_user` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `collection_management_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `can_view` tinyint(1) NOT NULL DEFAULT '1',
+  `can_edit` tinyint(1) NOT NULL DEFAULT '0',
+  `can_share` tinyint(1) NOT NULL DEFAULT '0',
+  `granted_at` timestamp NULL DEFAULT NULL,
+  `granted_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `cm_user_unique` (`collection_management_id`,`user_id`),
+  KEY `collection_management_user_user_id_foreign` (`user_id`),
+  KEY `collection_management_user_granted_by_foreign` (`granted_by`),
+  CONSTRAINT `collection_management_user_collection_management_id_foreign` FOREIGN KEY (`collection_management_id`) REFERENCES `collection_management` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `collection_management_user_granted_by_foreign` FOREIGN KEY (`granted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `collection_management_user_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `collection_user`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `collection_user` (
+  `collection_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `can_edit` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  KEY `collection_user_collection_id_foreign` (`collection_id`),
+  KEY `collection_user_user_id_foreign` (`user_id`),
+  CONSTRAINT `collection_user_collection_id_foreign` FOREIGN KEY (`collection_id`) REFERENCES `collections` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `collection_user_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `collections`;
@@ -242,6 +283,7 @@ DROP TABLE IF EXISTS `deck_management`;
 CREATE TABLE `deck_management` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `deck_owner_id` bigint unsigned NOT NULL,
+  `visibility` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'private',
   `deck_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `external_link` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT '',
@@ -253,7 +295,35 @@ CREATE TABLE `deck_management` (
   `archetype_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `deck_management_archetype_id_foreign` (`archetype_id`),
-  CONSTRAINT `deck_management_archetype_id_foreign` FOREIGN KEY (`archetype_id`) REFERENCES `mtg_archetypes` (`id`)
+  KEY `deck_management_deck_owner_id_foreign` (`deck_owner_id`),
+  CONSTRAINT `deck_management_archetype_id_foreign` FOREIGN KEY (`archetype_id`) REFERENCES `mtg_archetypes` (`id`),
+  CONSTRAINT `deck_management_deck_owner_id_foreign` FOREIGN KEY (`deck_owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `deck_optimizer_issues`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `deck_optimizer_issues` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `issue_creator_id` bigint unsigned NOT NULL,
+  `issue_assignee_id` bigint unsigned DEFAULT NULL,
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `priority` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'medium',
+  `status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `issue_type_id` bigint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `deck_optimizer_issues_issue_creator_id_foreign` (`issue_creator_id`),
+  KEY `deck_optimizer_issues_issue_assignee_id_foreign` (`issue_assignee_id`),
+  KEY `deck_optimizer_issues_priority_index` (`priority`),
+  KEY `deck_optimizer_issues_status_index` (`status`),
+  KEY `deck_optimizer_issues_issue_type_id_foreign` (`issue_type_id`),
+  CONSTRAINT `deck_optimizer_issues_issue_assignee_id_foreign` FOREIGN KEY (`issue_assignee_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `deck_optimizer_issues_issue_creator_id_foreign` FOREIGN KEY (`issue_creator_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `deck_optimizer_issues_issue_type_id_foreign` FOREIGN KEY (`issue_type_id`) REFERENCES `enum_values` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `deck_owner`;
@@ -269,6 +339,24 @@ CREATE TABLE `deck_owner` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `enum_values`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `enum_values` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `domain` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `slug` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort` int unsigned NOT NULL DEFAULT '0',
+  `active` tinyint(1) NOT NULL DEFAULT '1',
+  `version` int unsigned NOT NULL DEFAULT '1',
+  `updated_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `enum_values_domain_slug_unique` (`domain`,`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `failed_jobs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -282,6 +370,41 @@ CREATE TABLE `failed_jobs` (
   `failed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `failed_jobs_uuid_unique` (`uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `invitation_tokens`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `invitation_tokens` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `used` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `invitation_tokens_email_unique` (`email`),
+  UNIQUE KEY `invitation_tokens_token_unique` (`token`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `issue_types`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `issue_types` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `slug` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `metadata` json DEFAULT NULL,
+  `sort` int NOT NULL DEFAULT '0',
+  `active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_by` bigint unsigned DEFAULT NULL,
+  `updated_by` bigint unsigned DEFAULT NULL,
+  `version` int unsigned NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `issue_types_slug_unique` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `job_batches`;
@@ -508,6 +631,31 @@ CREATE TABLE `password_reset_tokens` (
   PRIMARY KEY (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `permission_role`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `permission_role` (
+  `permission_id` bigint unsigned NOT NULL,
+  `role_id` bigint unsigned NOT NULL,
+  PRIMARY KEY (`permission_id`,`role_id`),
+  KEY `permission_role_role_id_foreign` (`role_id`),
+  CONSTRAINT `permission_role_permission_id_foreign` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `permission_role_role_id_foreign` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `permissions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `permissions` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `permissions_name_unique` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `personal_access_tokens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -526,6 +674,31 @@ CREATE TABLE `personal_access_tokens` (
   UNIQUE KEY `personal_access_tokens_token_unique` (`token`),
   KEY `personal_access_tokens_tokenable_type_tokenable_id_index` (`tokenable_type`,`tokenable_id`),
   KEY `personal_access_tokens_expires_at_index` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `role_user`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `role_user` (
+  `role_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  PRIMARY KEY (`role_id`,`user_id`),
+  KEY `role_user_user_id_foreign` (`user_id`),
+  CONSTRAINT `role_user_role_id_foreign` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `role_user_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `roles`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `roles` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `roles_name_unique` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `scryfall_imports`;
@@ -648,14 +821,17 @@ DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `alias` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `email_verified_at` timestamp NULL DEFAULT NULL,
   `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `remember_token` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
+  `is_superuser` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `users_email_unique` (`email`)
+  UNIQUE KEY `users_email_unique` (`email`),
+  UNIQUE KEY `users_alias_unique` (`alias`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -715,3 +891,13 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (64,'2025_10_22_220
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (65,'2025_10_22_220939_add_columns_to_mtg_archetypes_table',32);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (66,'2025_10_25_152501_add_slug_to_card_data_from_set_data_table',33);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (67,'2025_10_25_200816_add_full_text_index_to_card_data_from_set_data_table',34);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (70,'2025_10_30_231820_create_invitiation_tokens_table',35);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (71,'2025_11_02_082628_add_alias_to_users_table',36);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (72,'2025_11_02_091735_add_visibility_to_deck_management_table',37);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (73,'2025_11_04_194116_create_deck_optimizer_issues_table',38);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (74,'2025_11_14_212853_create_roles_table',39);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (75,'2025_11_16_165940_create_collection_user_pivot_table',40);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (76,'2025_11_16_205521_add_collection_management_user_table',41);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (77,'2025_11_23_192426_create_issue_type_table',42);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (78,'2025_11_23_225403_create_enum_values_table',43);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (80,'2025_11_24_220254_add_foreign_key_for_issue_type_to_deck_optimizer_issues_table',44);
