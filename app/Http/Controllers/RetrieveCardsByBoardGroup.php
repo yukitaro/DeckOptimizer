@@ -54,8 +54,6 @@ class RetrieveCardsByBoardGroup extends Controller
                     return null;
                 }
 
-                //\Log::info("Resolved: normalized {$card->id} → sourceCard {$sourceCard->id}, metadata {$meta->id}, set {$set->id}");
-
                 $imageLookup = MtgImageLookup::where('card_uuid', $sourceCard->card_uuid)->first();
                 $imageUrl = $imageLookup->canonical_image_url
                     ?? $meta->image_url_to_use
@@ -73,6 +71,12 @@ class RetrieveCardsByBoardGroup extends Controller
                     'slug' => $sourceCard->slug,
                     'set_name' => $sourceCard->set_name,
                     'number_in_set' => $sourceCard->number_in_set,
+                    'card_from_set' => [
+                        'id' => $sourceCard->id,
+                        'number_in_set' => $sourceCard->number_in_set,
+                        'set_name' => $sourceCard->set_name,
+                        'slug' => $sourceCard->slug,
+                    ]
                 ];
             });
 

@@ -36,16 +36,32 @@ rsync "${RSYNC_OPTS[@]}" DeckOptimizer-mtg-scrapers/ \
   "${UNRAID_USER}@${UNRAID_IP}:${DEST_PATH}/DeckOptimizer-mtg-scrapers/"
 echo "✅ Sync complete!"
 
-ssh -i "${SSH_KEY}" "${UNRAID_USER}@${UNRAID_IP}" bash -lc '
+ssh -i "${SSH_KEY}" "${UNRAID_USER}@${UNRAID_IP}" bash -s <<'EOF'
+# ... (Remote script block inside ssh -i "${SSH_KEY}" ...)
 set -euo pipefail
-DEST_PATH="'"${DEST_PATH}"'"
-REBUILD="'"${REBUILD:-false}"'"
+DEST_PATH="/mnt/user/appdata/deckoptimizer"
+REBUILD="false"
 SAIL_UID=1337
 SAIL_GID=1000
 
-cd "${DEST_PATH}" || { echo "cd ${DEST_PATH} failed"; exit 1; }
+cd "$DEST_PATH" || { echo "cd $DEST_PATH failed"; exit 1; }
 
-# Ensure .env exists
+# 1. Prepare runtime dirs (MUST happen before chown)
+mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache supervisor
+echo "✅ Prepared runtime directories."
+
+# 2. Stop containers safely
+docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+echo "✅ Containers stopped."
+
+# 3. Attempt to fix ownership/permissions on host directories (MUST run before composer install)
+# This prevents permission denied errors during runtime/composer install if Unraid's mask is wrong.
+chown -R ${SAIL_UID}:${SAIL_GID} bootstrap/cache storage supervisor || true
+chmod -R 775 bootstrap/cache storage supervisor || true
+find storage -type d -exec chmod g+s {} + || true
+echo "✅ Initial permissions set."
+
+# 4. Ensure .env exists
 if [ ! -f .env ]; then
   if [ -f .env.production ]; then
     cp .env.production .env
@@ -56,37 +72,24 @@ if [ ! -f .env ]; then
   fi
 fi
 
-# Prepare runtime dirs
-mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache bootstrap-cache supervisor
-mkdir -p bootstrap-cache  # host bind mount for bootstrap/cache
+# 5. Run composer
+docker-compose -f docker-compose.prod.yml run --rm backend \
+  composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+echo "✅ Composer dependencies installed."
 
-
-# Stop containers safely
-docker-compose -f docker-compose.prod.yml down || true
-
-# Run composer inside official composer:2 container (deterministic)
-docker run --rm \
-  -u "$(id -u):$(id -g)" \
-  -v "$(pwd):/app" \
-  -w /app \
-  composer:2 \
-  composer install --no-dev --optimize-autoloader --ignore-platform-reqs --no-interaction
-
-# Verify vendor
+# 6. Verify vendor (Optional but good check)
 if [ ! -d vendor/laravel ]; then
-  echo "❌ vendor missing after composer install"; ls -la vendor || true; exit 1
+  echo "❌ vendor missing after composer install"; exit 1
 fi
 echo "✅ Composer vendor present"
 
-# Attempt to fix ownership/permissions for Unraid mounts (best-effort)
-chown -R ${SAIL_UID}:${SAIL_GID} bootstrap/cache bootstrap-cache storage supervisor || true
-chmod -R 775 bootstrap/cache bootstrap-cache storage supervisor || truefind storage -type d -exec chmod g+s {} + || true
 
-# Optionally rebuild (no-cache) then start
+# 7. Optionally rebuild (no-cache) then start
 if [ "${REBUILD}" = "true" ]; then
   docker-compose -f docker-compose.prod.yml build --no-cache backend
 fi
 docker-compose -f docker-compose.prod.yml up -d
+echo "✅ Containers started."
 
 # Wait for backend health
 for i in $(seq 1 60); do
@@ -121,7 +124,7 @@ fi
 
 echo "✅ Remote deploy completed"
 docker-compose -f docker-compose.prod.yml ps
-'
+EOF
 
 echo ""
 echo "🎉 DeckOptimizer deployed successfully!"

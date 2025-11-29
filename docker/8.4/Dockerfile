@@ -79,6 +79,7 @@ RUN apk add --no-cache --virtual .build-deps \
 # Copy app + vendor from builder
 COPY --from=builder /app/vendor /var/www/html/vendor
 COPY --from=builder /app /var/www/html
+COPY --from=builder /usr/bin/composer /usr/bin/composer
 
 # Runtime configuration and lightweight entrypoint
 COPY docker/8.4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
