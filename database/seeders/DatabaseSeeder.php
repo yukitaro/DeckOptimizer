@@ -3,8 +3,14 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+
 use Illuminate\Database\Seeder;
+
+use Database\Seeders\SetDataSeeder;
+use Database\Seeders\CardDataNormalizedSeeder;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Database\Seeders\IssueTypesSeeder;
+use Database\Seeders\SiteFeaturesSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,11 +19,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // php artisan migrate:fresh --seed for a new instance
 
         $this-call([
             SetDataSeeder::class,
             CardDataNormalizedSeeder::class,
+            RolesAndPermissionsSeeder::class,
+            IssueTypesSeeder::class,
+            SiteFeaturesSeeder::class
         ]);
     }
 }

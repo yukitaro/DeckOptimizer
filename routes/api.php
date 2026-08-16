@@ -36,6 +36,7 @@ use App\Models\MtgJsonImportCandidate;
 use App\Models\MtgDeckBoardGroups;
 use App\Models\SetData;
 use App\Models\SetsInCollection;
+use App\Models\SiteFeatures;
 use App\Models\User;
 
 Route::get('/health', fn() => response()->json(['status' => 'ok']));
@@ -727,3 +728,12 @@ Route::middleware('auth:sanctum')->group(function() {
     Route::delete('/issues/{id}', [IssueController::class, 'destroy']);
 });
 
+Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/site-features', function () {
+        return response()->json(SiteFeatures::orderBy('site_mode')->orderBy('sort_order')->get());
+    });
+
+    Route::get('/site-features/modes', function () {
+        return response()->json(SiteFeatures::select('site_mode')->distinct()->pluck('site_mode'));
+    });
+});
