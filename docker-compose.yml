@@ -1,3 +1,6 @@
+name: deckows
+
+project_directory: ..
 services:
     frontend:
         build:
@@ -9,7 +12,7 @@ services:
         - ./frontend:/app
     laravel.test:
         build:
-            context: './vendor/laravel/sail/runtimes/8.4'
+            context: './backend/vendor/laravel/sail/runtimes/8.4'
             dockerfile: Dockerfile #docker/8.4/Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP}'
@@ -26,7 +29,8 @@ services:
             XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
             IGNITION_LOCAL_SITES_PATH: '${PWD}'
         volumes:
-            - '.:/var/www/html'
+            - './backend:/var/www/html'
+            - './DeckOptimizer-mtg-scrapers:/var/www/html/DeckOptimizer-mtg-scrapers'
         networks:
             - sail
         depends_on:
@@ -46,7 +50,7 @@ services:
             MYSQL_EXTRA_OPTIONS: '${MYSQL_EXTRA_OPTIONS}'
         volumes:
             - '/home/ktkihara/deckdb:/var/lib/mysql'
-            - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+            - './backend/vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
         networks:
             - sail
         healthcheck:
@@ -64,7 +68,7 @@ services:
         ports:
             - "3001:3000"
         volumes:
-            - ./puppeteer-service:/app
+            - ./puppeteer:/app
             - puppeteer_node_modules:/app/node_modules
         restart: unless-stopped
         networks:

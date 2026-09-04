@@ -31,5 +31,6 @@ class SetData extends Model
         'card_metadata_id',
         'imported_from_mtgjson',
         'date_of_json_used_for_import',
+        'cards_populated',
     ];
 }

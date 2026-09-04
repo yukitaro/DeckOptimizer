@@ -36,10 +36,6 @@ class CardDataFromSetData extends Model
         return $this->hasMany(CollectedCardsFromSets::class, 'card_data_id');
     }
 
-    public function bulkPrice() {
-        return $this->hasOne(MtgBulkPrices::class, 'scryfall_id', 'card_metadata.scryfallId');
-    }
- 
     /**
      * The attributes that are mass assignable.
      *
@@ -61,6 +57,7 @@ class CardDataFromSetData extends Model
         'power',
         'printings',
         'rarity',
+        'release_date',
         'set_code',
         'text',
         'toughness',

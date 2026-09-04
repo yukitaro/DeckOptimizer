@@ -61,23 +61,57 @@ class SetDataSeeder extends Seeder
                     $setCode = strtoupper($setData['code'] ?? '');
                     if ($onlySets && !in_array($setCode, $onlySets)) continue;
 
-                    $existingSet = SetData::firstOrCreate(
+                    Log::info("DEBUG Set Level - Code: {$setCode}, ReleaseDate: " . ($setData['releaseDate'] ?? 'NULL'));
+
+                    $existingSet = SetData::updateOrCreate(
                         ['set_name' => $setCode],
                         [
                             'official_set_code' => $setData['name'],
-                            'release_date' => $setData['releaseDate'] ?? null,
-                            'total_cards' => $setData['totalSetSize'] ?? null,
-                            'cards_populated' => false,
+                            'release_date'      => $setData['releaseDate'] ?? null,
+                            'total_cards'       => $setData['totalSetSize'] ?? null,
                         ]
                     );
 
                     if ($forceMode || !$existingSet->cards_populated) {
                         Log::info("📦 Seeding cards for $setCode");
 
-                        $cardPointer = JsonParser::parse($file)->pointer('/data/cards');
-                        foreach ($cardPointer as $cardGroup) {
-                            foreach ($cardGroup as $cardJson) {
-                                if (!is_array($cardJson)) continue;
+                        $cardsArray = $setData['cards'] ?? [];
+                        Log::info("DEBUG Cards Array Count: " . count($cardsArray));
+
+                        // Wrap all database operations for this set in a single transaction
+                        DB::transaction(function () use (
+                            $cardsArray, 
+                            $existingSet, 
+                            $setCode, 
+                            $slugOnly, 
+                            &$normalizedSeen, 
+                            $setData
+                        ) {
+                            // Pre-load existing cards for this set into an in-memory key-value map
+                            $existingCards = $existingSet->cardsInSet()
+                                ->get()
+                                ->keyBy('card_uuid');
+
+                            // Pre-load Scryfall image lookups in a single batch query
+                            $scryfallIds = collect($cardsArray)
+                                ->pluck('identifiers.scryfallId')
+                                ->filter()
+                                ->unique()
+                                ->toArray();
+
+                            $imageLookups = !empty($scryfallIds)
+                                ? MtgImageLookup::whereIn('card_uuid', $scryfallIds)->get()->keyBy('card_uuid')
+                                : collect();
+
+                            $processedCount = 0;
+
+                            foreach ($cardsArray as $cardJson) {
+                                if (!is_array($cardJson) || !isset($cardJson['uuid'])) {
+                                    Log::warning("DEBUG: Invalid card element encountered for $setCode");
+                                    continue;
+                                }
+
+                                $processedCount++;
 
                                 if ($slugOnly) {
                                     $slug = $this->makeSlug($cardJson['name']);
@@ -96,41 +130,50 @@ class SetDataSeeder extends Seeder
                                 $frontImage = $cardJson['image_uris']['normal']
                                     ?? ($cardJson['card_faces'][0]['image_uris']['normal'] ?? null);
 
-                                $cardRow = $existingSet->cardsInSet()->updateOrCreate(
-                                    [
-                                        'card_uuid' => $cardJson['uuid'],
-                                        'set_name' => $setCode,
-                                        'number_in_set' => $cardJson['number'],
-                                    ],
-                                    [
-                                        'name' => $cardJson['name'],
-                                        'magic_set_data_id' => $existingSet->id,
-                                        'card_uuid' => $cardJson['uuid'],
-                                        'card_multiverse_id' => $identifiers['multiverseId'] ?? null,
-                                        'colors' => implode(',', $cardJson['colors'] ?? []),
-                                        'colorIdentities' => implode(',', $cardJson['colorIdentity'] ?? []),
-                                        'keywords' => implode(',', $cardJson['keywords'] ?? []),
-                                        'mana_cost' => $cardJson['manaCost'] ?? null,
-                                        'mana_value' => $cardJson['manaValue'] ?? null,
-                                        'card_metadata_id' => $metadata->id,
-                                        'power' => $cardJson['power'] ?? null,
-                                        'printings' => implode(',', $cardJson['printings'] ?? []),
-                                        'rarity' => $cardJson['rarity'] ?? null,
-                                        'text' => $cardJson['text'] ?? null,
-                                        'toughness' => $cardJson['toughness'] ?? null,
-                                        'type' => $cardJson['type'] ?? null,
-                                        'types' => implode(',', $cardJson['types'] ?? []),
-                                        'image_url' => $frontImage,
-                                        'image_normalized_at' => $frontImage ? now() : null,
-                                        'slug' => $slug,
-                                    ]
-                                );
+                                $releaseDateToUse = $cardJson['originalReleaseDate'] 
+                                    ?? $cardJson['releaseDate'] 
+                                    ?? $existingSet->release_date 
+                                    ?? null;
+
+                                $cardAttributes = [
+                                    'name'                => $cardJson['name'],
+                                    'magic_set_data_id'   => $existingSet->id,
+                                    'card_uuid'           => $cardJson['uuid'],
+                                    'set_name'            => $setCode,
+                                    'number_in_set'       => $cardJson['number'],
+                                    'card_multiverse_id'  => $identifiers['multiverseId'] ?? null,
+                                    'colors'              => implode(',', $cardJson['colors'] ?? []),
+                                    'colorIdentities'     => implode(',', $cardJson['colorIdentity'] ?? []),
+                                    'keywords'            => implode(',', $cardJson['keywords'] ?? []),
+                                    'mana_cost'           => $cardJson['manaCost'] ?? null,
+                                    'mana_value'          => $cardJson['manaValue'] ?? null,
+                                    'card_metadata_id'    => $metadata->id,
+                                    'power'               => $cardJson['power'] ?? null,
+                                    'printings'           => implode(',', $cardJson['printings'] ?? []),
+                                    'rarity'              => $cardJson['rarity'] ?? null,
+                                    'release_date'        => $releaseDateToUse,
+                                    'text'                => $cardJson['text'] ?? null,
+                                    'toughness'           => $cardJson['toughness'] ?? null,
+                                    'type'                => $cardJson['type'] ?? null,
+                                    'types'               => implode(',', $cardJson['types'] ?? []),
+                                    'image_url'           => $frontImage,
+                                    'image_normalized_at' => $frontImage ? now() : null,
+                                    'slug'                => $slug,
+                                ];
+
+                                // Instant update or create using pre-loaded map
+                                $cardRow = $existingCards->get($cardJson['uuid']);
+                                if ($cardRow) {
+                                    $cardRow->update($cardAttributes);
+                                } else {
+                                    $cardRow = $existingSet->cardsInSet()->create($cardAttributes);
+                                    $existingCards->put($cardJson['uuid'], $cardRow);
+                                }
 
                                 $normalizedName = strtolower(trim($cardRow->name));
                                 if (!isset($normalizedSeen[$normalizedName])) {
-                                    $lookup = $identifiers['scryfallId']
-                                        ? MtgImageLookup::where('card_uuid', $identifiers['scryfallId'])->first()
-                                        : null;
+                                    $scryfallId = $identifiers['scryfallId'] ?? null;
+                                    $lookup = $scryfallId ? $imageLookups->get($scryfallId) : null;
 
                                     $image = $frontImage ?? $lookup?->canonical_image_url ?? $cardRow->image_url;
 
@@ -138,9 +181,9 @@ class SetDataSeeder extends Seeder
                                         ['normalized_name' => $normalizedName, 'set_code' => $setCode],
                                         [
                                             'source_printing_id' => $cardRow->id,
-                                            'source_printing' => $cardRow->number_in_set,
-                                            'printings' => implode(',', $cardJson['printings'] ?? []),
-                                            'image_url_to_use' => $image,
+                                            'source_printing'    => $cardRow->number_in_set,
+                                            'printings'          => implode(',', $cardJson['printings'] ?? []),
+                                            'image_url_to_use'   => $image,
                                         ]
                                     );
 
@@ -150,21 +193,23 @@ class SetDataSeeder extends Seeder
                                 $metadata->card_data_from_set_data_id = $cardRow->id;
                                 $metadata->save();
                             }
-                        }
 
-                        $existingSet->update([
-                            'cards_populated' => true,
-                            'imported_from_mtgjson' => true,
-                            'date_of_json_used_for_import' => $setData['meta']['date'] ?? now(),
-                        ]);
+                            Log::info("DEBUG Total Cards Processed for $setCode: $processedCount");
 
-                        MtgJsonImportCandidate::where('set_code', $setCode)
-                            ->update(['imported_into_database' => true]);
+                            $existingSet->update([
+                                'cards_populated' => true,
+                                'imported_from_mtgjson' => true,
+                                'date_of_json_used_for_import' => $setData['meta']['date'] ?? now(),
+                            ]);
 
-                        SetEnrichmentStatus::updateOrCreate(
-                            ['set_code' => $setCode],
-                            ['enriched_at' => now(), 'logic_version' => 'v1']
-                        );
+                            MtgJsonImportCandidate::where('set_code', $setCode)
+                                ->update(['imported_into_database' => true]);
+
+                            SetEnrichmentStatus::updateOrCreate(
+                                ['set_code' => $setCode],
+                                ['enriched_at' => now(), 'logic_version' => 'v1']
+                            );
+                        });
 
                         Log::info("✅ Finished $setCode");
                     } else {
@@ -225,4 +270,4 @@ class SetDataSeeder extends Seeder
 
         return $metadata;
     }
-}    
+}

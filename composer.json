@@ -8,10 +8,8 @@
     "repositories": [
         {
             "type": "path",
-            "url": "./DeckOptimizer-mtg-scrapers",
-            "options": {
-                "symlink": true
-            }
+            "url": "/var/www/DeckOptimizer-mtg-scrapers",
+            "options": { "symlink": true }
         },
         {
             "type": "vcs",

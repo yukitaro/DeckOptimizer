@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "09ec64fc4edd350a73d028b00dc00561",
+    "content-hash": "a21c634ce5c16b435cab4ebebcbebc59",
     "packages": [
         {
             "name": "brick/math",
@@ -6524,8 +6524,8 @@
             "version": "dev-main",
             "dist": {
                 "type": "path",
-                "url": "./DeckOptimizer-mtg-scrapers",
-                "reference": "2043e09dd1794d7b7536a956677cffa6d5b55893"
+                "url": "/var/www/DeckOptimizer-mtg-scrapers",
+                "reference": "d32c32bcbf143932c45202f872e9775909c54e5f"
             },
             "require": {
                 "php": "^8.2"
@@ -6539,7 +6539,7 @@
             "description": "MTG deck scrapers",
             "transport-options": {
                 "symlink": true,
-                "relative": true
+                "relative": false
             }
         }
     ],
@@ -9228,5 +9228,5 @@
         "php": "^8.2"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }

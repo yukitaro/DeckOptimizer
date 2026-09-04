@@ -19,3 +19,5 @@ Schedule::command('scryfall:get-and-import-bulk-data')
     ->withoutOverlapping()
     ->onSuccess(fn () => info('✅ Scryfall bulk price refresh completed.'))
     ->onFailure(fn () => info('❌ Scryfall bulk price refresh failed.'));
+
+Schedule::command('telescope:prune --hours=24')->daily();

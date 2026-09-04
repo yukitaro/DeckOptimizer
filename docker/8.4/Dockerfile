@@ -89,7 +89,9 @@ RUN chmod +x /usr/local/bin/start-container || true
     
 # Create non-root user (sail uid 1337) and set group
 RUN addgroup -g $WWWGROUP sail \
- && adduser -u 1337 -G sail -D -H sail
+ && adduser -u 1337 -G sail -D -H sail \
+ && mkdir -p /home/sail/.config/psysh \
+ && chown -R sail:sail /home/sail /var/www/html /var/log/supervisor /tmp/supervisor /etc/caddy
 
 # Supervisor + Laravel runtime dirs (now that sail exists)
 RUN mkdir -p /var/log/supervisor /tmp/supervisor \

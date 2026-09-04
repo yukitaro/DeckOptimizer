@@ -3,10 +3,10 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
-
 use App\Services\CollectedCardService;
 
 use App\Models\CardDataFromSetData;
+use App\Models\CardMetadata;
 use App\Models\SetData;
 use App\Models\SetsInCollection;
 
@@ -18,6 +18,7 @@ class CollectedCardsImportService
         'manabox' => [
             'card_name' => 'Name',
             'set_code' => 'Set code',
+            'scryfall_id' => 'Scryfall ID',
             'card_count' => 'Quantity',
             'condition' => 'Condition',
             'is_foil' => 'Foil',
@@ -45,26 +46,31 @@ class CollectedCardsImportService
             'number_in_set' => 'Number',
             'printing_variant' => null,
             'storage_location' => null,
-            
         ]
-        // Add more formats here
     ];
 
     protected static function detectFormat(array $headerRow): ?array
     {
         foreach (static::$knownFormats as $format => $map) {
             $matched = collect($map)->filter(fn($header) => $header && in_array($header, $headerRow));
-            if ($matched->count() >= 3) { // threshold for confidence
+            Log::info("Format check: {$format}", [
+                'matched_headers' => $matched->all(),
+                'match_count' => $matched->count()
+            ]);
+
+            if ($matched->count() >= 3) {
+                Log::info("Detected format: {$format}", ['map' => $map]);
                 return $map;
             }
         }
 
+        Log::warning('No matching CSV format found');
         return null;
     }
 
     public static function importToCollection(string $mode, array $records, int $collectionId): void
     {
-        \Log::info('Import trigger', [
+        Log::info('Import trigger', [
             'collectionId' => $collectionId,
             'recordCount' => count($records),
             'mode' => $mode
@@ -77,45 +83,53 @@ class CollectedCardsImportService
         $start = microtime(true);
 
         \DB::transaction(function () use ($mode, $records, $collectionId, $start) {
+
             if ($mode === 'set') {
                 $setIds = SetsInCollection::where('collection_management_id', $collectionId)->pluck('id');
+
                 if ($setIds->isNotEmpty()) {
                     \DB::table('collected_cards')->whereIn('set_in_collection_id', $setIds)->delete();
                     SetsInCollection::whereIn('id', $setIds)->delete();
                 }
             }
 
+            // HEADER MAP
             $headerMap = static::detectFormat(array_keys($records[0]));
             if (!$headerMap || empty($headerMap['set_code']) || empty($headerMap['card_name']) || empty($headerMap['card_count'])) {
                 throw new \Exception('CSV missing required set_code/card_name/card_count column mapping');
             }
 
             $setCodeColumn = $headerMap['set_code'];
+
             $grouped = collect($records)->groupBy($setCodeColumn);
 
-            // Normalize CSV set codes to uppercase
+            // Normalize CSV set codes
             $normalizeCode = fn($c) => strtoupper(trim((string)$c));
             $allCodes = $grouped->keys()->map($normalizeCode)->unique()->values();
 
-            // Map official_set_code -> SetData.id (for SetsInCollection linkage)
+            // Lookup SetData
             $setIdByCode = SetData::whereIn('set_name', $allCodes)
                 ->pluck('id', 'set_name');
 
             foreach ($grouped as $csvSetCodeRaw => $recordsForSet) {
+
                 $csvSetCode = $normalizeCode($csvSetCodeRaw);
                 $setId = $setIdByCode[$csvSetCode] ?? null;
+
                 if (!$setId) {
-                    // If we can’t find the SetData, skip this entire group
-                    \Log::warning('Unresolved SetData for CSV set code', ['csvSetCode' => $csvSetCodeRaw, 'normalized' => $csvSetCode]);
+                    Log::warning('Unresolved SetData for CSV set code', [
+                        'csvSetCodeRaw' => $csvSetCodeRaw,
+                        'normalized' => $csvSetCode
+                    ]);
                     continue;
                 }
 
                 $setInCollectionId = static::resolveOrCreateSetInCollection($collectionId, $setId);
 
-                // De-duplicate by card name (case-insensitive) within this set
+                // DEDUPE
                 $rowsForSet = static::dedupeRowsForSet($recordsForSet, $headerMap);
 
-                // Preload all card names for this set from card_data_from_set_data using set_name = CSV set code
+                // CARD LOOKUP
                 $nameToCardId = CardDataFromSetData::where('set_name', $csvSetCode)
                     ->get(['id', 'name'])
                     ->reduce(function ($carry, $row) {
@@ -136,13 +150,36 @@ class CollectedCardsImportService
                         continue;
                     }
 
-                    $cardId = $nameToCardId[mb_strtolower($cardName)] ?? null;
+                    $cardId = null;
+
+                    // Scryfall ID lookup
+                    $scryfallId = $record[$headerMap['scryfall_id']] ?? null;
+
+                    if ($scryfallId) {
+                        $meta = CardMetadata::where('scryfall_id', $scryfallId)->first();
+
+                        if ($meta) {
+                            $cardId = $meta->card_data_from_set_data_id;
+                        }
+                    }
+
+                    // Name fallback
                     if (!$cardId) {
-                        // No resolver, strict by-name match only
+                        $cardId = $nameToCardId[mb_strtolower($cardName)] ?? null;
+                    }
+
+                    if (!$cardId) {
+                        Log::error('Card lookup failed', [
+                            'cardName' => $cardName,
+                            'setCode' => $csvSetCode,
+                            'scryfallId' => $scryfallId,
+                            'availableNames' => array_keys($nameToCardId)
+                        ]);
                         $skippedCount++;
                         continue;
                     }
 
+                    // Build attributes
                     $attributes = [
                         'set_in_collection_id' => $setInCollectionId,
                         'card_data_id' => $cardId,
@@ -150,16 +187,14 @@ class CollectedCardsImportService
                         'condition' => $headerMap['condition'] ? ($record[$headerMap['condition']] ?? null) : null,
                         'is_foil' => static::parseBoolish($headerMap['is_foil'] ? ($record[$headerMap['is_foil']] ?? null) : null),
                         'printing_variant' => $headerMap['printing_variant'] ? ($record[$headerMap['printing_variant']] ?? null) : null,
-                        'purchase_price' => $headerMap['purchase_price'] ? ($record[$headerMap['purchase_price']] ?? null) : null,
+                        'purchase_price' => $headerMap['purchase_price'] ? (($record[$headerMap['purchase_price']] ?? null) ?: null) : null,
                         'storage_location' => $headerMap['storage_location'] ? ($record[$headerMap['storage_location']] ?? null) : null,
                     ];
 
                     if ($mode === 'merge') {
-                        // Merge semantics (increment/upsert)
                         CollectedCardService::handle('merge', $attributes);
                         $processedCount++;
                     } else {
-                        // Set mode — prepare batch insert (safe after clearing)
                         $payloads[] = array_merge($attributes, [
                             'created_at' => now(),
                             'updated_at' => now(),
@@ -169,10 +204,11 @@ class CollectedCardsImportService
                 }
 
                 if ($mode === 'set' && !empty($payloads)) {
+                    Log::info('SET mode: inserting payload batch', ['payloadCount' => count($payloads)]);
                     \DB::table('collected_cards')->insert($payloads);
                 }
 
-                \Log::info('Set import summary', [
+                Log::info('Set import summary', [
                     'set_code_input' => $csvSetCodeRaw,
                     'normalized_code' => $csvSetCode,
                     'set_id' => $setId,
@@ -185,7 +221,7 @@ class CollectedCardsImportService
             }
 
             $duration = round(microtime(true) - $start, 2);
-            \Log::info('Import complete', [
+            Log::info('Import complete', [
                 'collectionId' => $collectionId,
                 'duration_seconds' => $duration
             ]);
@@ -210,32 +246,26 @@ class CollectedCardsImportService
     protected static function parseBoolish($value): bool
     {
         $v = strtolower(trim((string)$value));
-        return in_array($v, ['1','y','yes','true','foil'], true);
+        $result = in_array($v, ['1','y','yes','true','foil'], true);
+
+        return $result;
     }
 
-    /**
-     * Collapse duplicates by card name within a set:
-     * - Sums counts
-     * - ORs foil
-     * - Prefers first non-empty condition/storage
-     * - Keeps max purchase price
-     */
     protected static function dedupeRowsForSet(iterable $rows, array $headerMap): array
     {
         $map = [];
 
-        foreach ($rows as $row) {
+        foreach ($rows as $rowIndex => $row) {
             $name = trim((string)($row[$headerMap['card_name']] ?? ''));
-            if ($name === '') continue;
-
             $count = (int)($row[$headerMap['card_count']] ?? 0);
-            if ($count <= 0) continue;
 
-            $key = mb_strtolower($name);
+            if ($name === '' || $count <= 0) continue;
+
+            $key = mb_strtolower($name) . '|' . ($row[$headerMap['scryfall_id']] ?? '');
 
             $isFoil = static::parseBoolish($headerMap['is_foil'] ? ($row[$headerMap['is_foil']] ?? null) : null);
             $condition = $headerMap['condition'] ? ($row[$headerMap['condition']] ?? null) : null;
-            $purchase = $headerMap['purchase_price'] ? ($row[$headerMap['purchase_price']] ?? null) : null;
+            $purchase = $headerMap['purchase_price'] ? (($row[$headerMap['purchase_price']] ?? null) ?: null) : null;
             $storage = $headerMap['storage_location'] ? ($row[$headerMap['storage_location']] ?? null) : null;
 
             if (!isset($map[$key])) {
@@ -251,16 +281,20 @@ class CollectedCardsImportService
             } else {
                 $map[$key]['__count'] += $count;
                 $map[$key]['__is_foil'] = $map[$key]['__is_foil'] || $isFoil;
+
                 if (empty($map[$key]['__condition']) && !empty($condition)) {
                     $map[$key]['__condition'] = $condition;
                 }
+
                 if ($purchase !== null && is_numeric($purchase)) {
                     $existing = $map[$key]['__purchase'];
                     $existingNum = is_numeric($existing) ? (float)$existing : null;
+
                     if ($existingNum === null || (float)$purchase > $existingNum) {
                         $map[$key]['__purchase'] = $purchase;
                     }
                 }
+
                 if (empty($map[$key]['__storage']) && !empty($storage)) {
                     $map[$key]['__storage'] = $storage;
                 }
@@ -288,5 +322,5 @@ class CollectedCardsImportService
         }
 
         return $out;
-    }    
+    }
 }

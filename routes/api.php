@@ -12,6 +12,7 @@ use App\Http\Controllers\AdminRoleController;
 use App\Http\Controllers\AdminUserController;
 
 use App\Http\Controllers\CollectedCardsImportController;
+use App\Http\Controllers\CollectionAnalyticsController;
 use App\Http\Controllers\CollectionManagementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeckController;
@@ -19,7 +20,9 @@ use App\Http\Controllers\DeckScrapersController;
 use App\Http\Controllers\EnumController;
 use App\Http\Controllers\IssueController;
 use App\Http\Controllers\IssueEnumController;
+use App\Http\Controllers\ListManagementController;
 use App\Http\Controllers\MtgBulkPriceController;
+use App\Http\Controllers\MTGCardSearchController;
 use App\Http\Controllers\RetrieveCardsByBoardGroup;
 
 use App\Builders\CollectionCardQueryBuilder;
@@ -38,6 +41,8 @@ use App\Models\SetData;
 use App\Models\SetsInCollection;
 use App\Models\SiteFeatures;
 use App\Models\User;
+
+use App\Jobs\SeedSetJob;
 
 Route::get('/health', fn() => response()->json(['status' => 'ok']));
 
@@ -89,6 +94,8 @@ Route::get('/cardsfromsets/{setnames}/{rarities?}', function (string $setnames, 
     return $query->limit($limit)->get();
 });
 
+// New Backend Consolidated Controller - 8/30/2026
+Route::get('/cards/search', [MTGCardSearchController::class, 'search']);
 
 Route::post('/cardsInDeck/{deck_id}/boardgroups/{board_groups}', [RetrieveCardsByBoardGroup::class, 'getCardsByBoardGroup']);
 
@@ -439,21 +446,37 @@ Route::middleware('auth:sanctum')->get('/collections/{collection_id}/cards', fun
 
     $setIds = $collection->setsInCollection()->pluck('id')->toArray();
 
+    // 1. Initialize query builder (Applies search, filters, and sorting)
     $builder = new CollectionCardQueryBuilder($request, $setIds);
-    $query = $builder->getQuery();
 
+    // 2. Fetch Aggregations (Global vs Filtered)
+    $globalMetrics = CollectionCardQueryBuilder::getGlobalMetrics($setIds);
+    $filteredMetrics = $builder->getFilteredMetrics();
+
+    // 3. Paginate the filtered slice
     $perPage = min(max((int) $request->get('per_page', 100), 1), 250);
     $page = max(1, (int) $request->get('page', 1));
 
-    $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+    $paginator = $builder->getQuery()->paginate($perPage, ['*'], 'page', $page);
 
+    // 4. Return combined response
     return response()->json([
         'data' => $paginator->items(),
         'meta' => [
-            'current_page' => $paginator->currentPage(),
-            'last_page' => $paginator->lastPage(),
+            'current_page'         => $paginator->currentPage(),
+            'last_page'            => $paginator->lastPage(),
             'total_matching_count' => $paginator->total(),
-            'is_complete' => $paginator->lastPage() === 1
+            'is_complete'           => $paginator->lastPage() === 1
+        ],
+        'aggregations' => [
+            'global' => [
+                'card_count'   => (int) ($globalMetrics->total_card_count ?? 0),
+                'market_value' => round((float) ($globalMetrics->total_market_value ?? 0), 2),
+            ],
+            'filtered' => [
+                'card_count'   => (int) ($filteredMetrics->total_card_count ?? 0),
+                'market_value' => round((float) ($filteredMetrics->total_market_value ?? 0), 2),
+            ]
         ]
     ]);
 });
@@ -538,12 +561,8 @@ Route::get('/import-candidates', function () {
 });
 
 Route::post('/import-candidates/{setCode}/import', function ($setCode) {
-    Artisan::call('seed:sets', ['--sets' => $setCode]);
-
-    \App\Models\MtgJsonImportCandidate::where('set_code', $setCode)
-        ->update(['imported_into_database' => true]);
-
-    return response()->json(['status' => 'ok']);
+    SeedSetJob::dispatch($setCode);
+    return response()->json(['status' => 'queued']);
 });
 
 Route::get('/import-candidates/ready-count', function () {
@@ -604,6 +623,27 @@ Route::get('/card/{card_name}', function($card_name) {
 Route::get('/dashboard/card/{card_id}/metadata', [DashboardController::class, 'cardMetadata']);
 
 Route::get('/dashboard/card/{set}/{slug}/{number}', [DashboardController::class, 'cardMetadataBySlugAndNumber']);
+
+Route::prefix('collections/{id}/analytics')->group(function () {
+    Route::get('/summary', [CollectionAnalyticsController::class, 'summary']);
+    Route::get('/sets', [CollectionAnalyticsController::class, 'sets']);
+    Route::get('/rarity', [CollectionAnalyticsController::class, 'rarity']);
+    Route::get('/foil', [CollectionAnalyticsController::class, 'foil']);
+    Route::get('/top', [CollectionAnalyticsController::class, 'top']);
+    Route::get('/colors', [CollectionAnalyticsController::class, 'colors']);
+});
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/lists', [ListManagementController::class, 'index']); 
+    Route::post('/lists', [ListManagementController::class, 'store']); 
+    Route::get('/lists/{list}', [ListManagementController::class, 'show']); 
+    Route::post('/lists/add-card', [ListManagementController::class, 'addCard']);
+    Route::post('/lists/update-item', [ListManagementController::class, 'updateItem']);
+    Route::post('/lists/delete-item', [ListManagementController::class, 'deleteItem']);
+});
+
+# Function stuff down here
 
 Route::post('/login', function (Request $request) {
     $request->validate([

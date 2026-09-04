@@ -14,9 +14,15 @@ class CollectedCardsImportController extends Controller
 {
     public function import(Request $request)
     {
+        $validated = $request->validate([
+            'csv' => ['required', 'file', 'mimes:csv,txt', 'max:102400'],
+            'mode' => ['required', 'in:merge,set,new'],
+            'collection_id' => ['required', 'integer'],
+        ]);
+
         $file = $request->file('csv');
-        $mode = $request->input('mode');
-        $collectionId = $request->input('collection_id');
+        $mode = $validated['mode'];
+        $collectionId = (int) $validated['collection_id'];
 
         $records = CsvImportUtility::parse($file);
 

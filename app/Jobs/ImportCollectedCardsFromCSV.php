@@ -17,6 +17,9 @@ class ImportCollectedCardsFromCSV implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $timeout = 900; // 15 minutes
+    public int $tries = 1;     // don't retry — a failed partial import would need manual cleanup
+
     protected $mode;
     protected $records;
     protected $recordsKey;
