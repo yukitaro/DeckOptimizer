@@ -24,12 +24,14 @@ class ImportCollectedCardsFromCSV implements ShouldQueue
     protected $records;
     protected $recordsKey;
     protected $collectionId;
+    protected $shouldDedupe;
 
-    public function __construct($mode, $recordsKey, $collectionId)
+    public function __construct($mode, $recordsKey, $collectionId, $shouldDedupe = true)
     {
         $this->mode = $mode;
         $this->recordsKey = $recordsKey;
         $this->collectionId = $collectionId;
+        $this->shouldDedupe = $shouldDedupe;
     }
 
     public function handle()
@@ -61,7 +63,8 @@ class ImportCollectedCardsFromCSV implements ShouldQueue
             CollectedCardsImportService::importToCollection(
                 $this->mode,
                 $records,
-                $this->collectionId
+                $this->collectionId,
+                $this->shouldDedupe
             );
 
             $collection->import_status = 'complete';

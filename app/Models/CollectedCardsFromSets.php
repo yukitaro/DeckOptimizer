@@ -22,11 +22,25 @@ class CollectedCardsFromSets extends Model
     public function cardFromSet() : BelongsTo
     {
         return $this->belongsTo(CardDataFromSetData::class, 'card_data_id');
-    }    
+    }
+
+    public function scopeInActiveInventory($query)
+    {
+        return $query->whereHas('setInCollection.collectionManagement', function ($q) {
+            $q->where('include_in_inventory', true);
+        });
+    }
 
     protected $fillable = [
         'card_count',
         'set_in_collection_id',
         'card_data_id',
+        'is_foil',
+        'language',
+        'printing_variant',
+        'condition',
+        'purchase_price',
+        'storage_location',
+        'normalized_attributes'
     ];
 }

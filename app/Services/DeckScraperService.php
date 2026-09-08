@@ -6,18 +6,33 @@ use Illuminate\Support\Facades\Http;
 
 use App\DataTransferObjects\DeckImportDTO;
 use Yukitaro\Scrapers\MtgDecksScraper;
+use Yukitaro\Scrapers\MeleeGgScraper;
 use Yukitaro\Scrapers\DeckScraper;
+
+use Symfony\Component\DomCrawler\Crawler;
 
 class DeckScraperService
 {
     public function importFromUrl(string $url): DeckImportDTO {
         $scraper = $this->resolveScraper($url);
+        
+        if (str_contains($url, 'melee.gg')) {
+            $response = Http::withHeaders(['Content-Type' => 'application/json',])
+                ->post("http://puppeteer:3000/scrape?site=melee.gg", [
+                    'url' => $url
+                ]);
+            \Log::info('Melee.gg scrape response', ['status' => $response->status()]);
+            \Log::info('Melee.gg scrape response', ['body' => $response->body()]);
+            $deckData = $scraper->parseDeck($response->json()['html'] ?? null, $url);
 
-        $response = Http::withHeaders(['Content-Type' => 'application/json',])
-            ->post("http://puppeteer:3000/scrape", [
-                'url' => $url,
-                'commands' => $scraper->getPuppeteerCommands() ?? [],
-            ]);
+            return $scraper->parseDeck($response->json()['html'] ?? '', $url);
+        } else {
+            $response = Http::withHeaders(['Content-Type' => 'application/json',])
+                ->post("http://puppeteer:3000/scrape", [
+                    'url' => $url,
+                    'commands' => $scraper->getPuppeteerCommands() ?? [],
+                ]);
+        }
 
         if (!$response->ok()) {
             \Log::error('Puppeteer scrape failed', [
@@ -81,6 +96,7 @@ class DeckScraperService
     }
     protected array $scraperPatterns = [
         '/mtgdecks\.net\/.+/' => \Yukitaro\Scrapers\MtgDecksScraper::class,
+        '/melee\.gg\/.+/' => \Yukitaro\Scrapers\MeleeGgScraper::class,
         //'/mtgtop8\.com\/deck\?id=\d+/' => \App\Scrapers\MTGTop8Scraper::class,
         // Add more patterns here
     ];

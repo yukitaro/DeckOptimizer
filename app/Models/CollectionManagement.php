@@ -56,13 +56,20 @@ class CollectionManagement extends Model
     }
 
     protected $fillable = [
-        'owner_id',
         'collection_name',
         'description',
+        'owner_id',
         'visibility',
+        'import_status',
+        'is_favorite',
+        'include_in_inventory',
+        'type',
+        'game_type',
     ];
 
     protected $casts = [
+        'is_favorite'          => 'boolean',
+        'include_in_inventory' => 'boolean',
         'visibility' => Visibility::class,
     ];
 }

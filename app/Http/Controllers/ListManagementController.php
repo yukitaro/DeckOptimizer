@@ -170,4 +170,70 @@ class ListManagementController extends Controller
             'item_id' => $item->id,
         ];
     }
+
+    public function bulkAddCards(Request $request)
+    {
+        $validated = $request->validate([
+            'list_name' => 'required|string',
+            'items'     => 'required|array',
+            'items.*.card_id' => 'required|integer|exists:card_data_from_set_data,id',
+            'items.*.is_foil' => 'boolean',
+        ]);
+
+        $userId = auth()->id();
+
+        $listName = $validated['list_name'] ?? null;
+        if (empty($listName)) {
+            $existingCount = ItemList::where('user_id', $userId)
+                ->where('list_type', 'mtg_cards')
+                ->where('name', 'LIKE', 'dynamic list %')
+                ->count();
+                
+            $listName = 'dynamic list ' . ($existingCount + 1);
+        }        
+
+        $result = \DB::transaction(function() use ($validated, $userId, $listName) {
+            $list = ItemList::firstOrCreate(
+                [
+                    'name'      => $listName,
+                    'user_id'   => $userId,
+                    'list_type' => 'mtg_cards',
+                ],
+                [
+                    'description' => null,
+                    'is_public'   => false,
+                ]
+            );
+        
+             foreach ($validated['items'] as $new_list_item) {
+                $cardId = $new_list_item['card_id'];
+                $quantity = $new_list_item['quantity'] ?? 1;
+                $is_foil = $new_list_item['is_foil'] ?? false;
+                
+                $list->items()->updateOrCreate(
+                    [
+                        'item_type' => 'card',
+                        'item_id'   => $cardId,
+                    ],
+                    [
+                        'quantity' => $quantity,
+                        'metadata' => [
+                            'is_foil' => (bool) $is_foil,
+                            'quantity' => $quantity,
+                        ],
+                    ]
+                );
+            }
+
+
+            return $list;
+        });
+
+        return [
+            'success' => true,
+            'list_id' => $result->id,
+            'items_sent' => count($validated['items']),
+            #'item_ids' => array_map(fn($item) => $item->id, $items),
+        ];
+    }
 }

@@ -25,6 +25,7 @@ class CollectedCardsImportService
             'purchase_price' => 'Purchase price',
             'printing_variant' => null,
             'storage_location' => null,
+            'finishes' => 'Foil',
         ],
         'deckbox' => [
             'card_name' => 'Card Name',
@@ -35,6 +36,7 @@ class CollectedCardsImportService
             'purchase_price' => 'Price',
             'printing_variant' => 'Variant',
             'storage_location' => 'Location',
+            'finishes' => null,
         ],
         'mtgcollectionbuilder' => [
             'card_name' => 'Name',
@@ -46,6 +48,7 @@ class CollectedCardsImportService
             'number_in_set' => 'Number',
             'printing_variant' => null,
             'storage_location' => null,
+            'finishes' => null,
         ]
     ];
 
@@ -68,7 +71,7 @@ class CollectedCardsImportService
         return null;
     }
 
-    public static function importToCollection(string $mode, array $records, int $collectionId): void
+    public static function importToCollection(string $mode, array $records, int $collectionId, bool $shouldDedupe): void
     {
         Log::info('Import trigger', [
             'collectionId' => $collectionId,
@@ -82,7 +85,7 @@ class CollectedCardsImportService
 
         $start = microtime(true);
 
-        \DB::transaction(function () use ($mode, $records, $collectionId, $start) {
+        \DB::transaction(function () use ($mode, $records, $collectionId, $shouldDedupe, $start) {
 
             if ($mode === 'set') {
                 $setIds = SetsInCollection::where('collection_management_id', $collectionId)->pluck('id');
@@ -127,7 +130,11 @@ class CollectedCardsImportService
                 $setInCollectionId = static::resolveOrCreateSetInCollection($collectionId, $setId);
 
                 // DEDUPE
-                $rowsForSet = static::dedupeRowsForSet($recordsForSet, $headerMap);
+                if ($shouldDedupe) {
+                    $rowsForSet = static::dedupeRowsForSet($recordsForSet, $headerMap);
+                } else {
+                    $rowsForSet = $recordsForSet;
+                }
 
                 // CARD LOOKUP
                 $nameToCardId = CardDataFromSetData::where('set_name', $csvSetCode)
@@ -179,25 +186,32 @@ class CollectedCardsImportService
                         continue;
                     }
 
+                    $finishes = !empty($headerMap['finishes']) ? ($record[$headerMap['finishes']] ?? null) : null;
+                    $normalizedAttributes = !empty($finishes) ? json_encode(['finishes' => (array) $finishes]) : null;
+                    $foilRaw = strtolower(trim($headerMap['is_foil'] ? ($record[$headerMap['is_foil']] ?? '') : ''));
+                    $isEtched = str_contains($foilRaw, 'etched');
+
                     // Build attributes
                     $attributes = [
-                        'set_in_collection_id' => $setInCollectionId,
-                        'card_data_id' => $cardId,
-                        'card_count' => $count,
-                        'condition' => $headerMap['condition'] ? ($record[$headerMap['condition']] ?? null) : null,
-                        'is_foil' => static::parseBoolish($headerMap['is_foil'] ? ($record[$headerMap['is_foil']] ?? null) : null),
-                        'printing_variant' => $headerMap['printing_variant'] ? ($record[$headerMap['printing_variant']] ?? null) : null,
-                        'purchase_price' => $headerMap['purchase_price'] ? (($record[$headerMap['purchase_price']] ?? null) ?: null) : null,
-                        'storage_location' => $headerMap['storage_location'] ? ($record[$headerMap['storage_location']] ?? null) : null,
+                        'set_in_collection_id'  => $setInCollectionId,
+                        'card_data_id'          => $cardId,
+                        'card_count'            => $count,
+                        'condition'             => $headerMap['condition'] ? ($record[$headerMap['condition']] ?? null) : null,
+                        'is_foil'               => $isEtched || static::parseBoolish($foilRaw),
+                        'printing_variant'      => $headerMap['printing_variant'] ? ($record[$headerMap['printing_variant']] ?? null) : null,
+                        'purchase_price'        => $headerMap['purchase_price'] ? (($record[$headerMap['purchase_price']] ?? null) ?: null) : null,
+                        'storage_location'      => $headerMap['storage_location'] ? ($record[$headerMap['storage_location']] ?? null) : null,
+                        'normalized_attributes' => $normalizedAttributes,
                     ];
 
                     if ($mode === 'merge') {
                         CollectedCardService::handle('merge', $attributes);
                         $processedCount++;
                     } else {
+                        $now = now()->toDateTimeString();
                         $payloads[] = array_merge($attributes, [
-                            'created_at' => now(),
-                            'updated_at' => now(),
+                            'created_at' => $now,
+                            'updated_at' => $now,
                         ]);
                         $processedCount++;
                     }
@@ -205,6 +219,7 @@ class CollectedCardsImportService
 
                 if ($mode === 'set' && !empty($payloads)) {
                     Log::info('SET mode: inserting payload batch', ['payloadCount' => count($payloads)]);
+                    Log::info('Payload data: ', ['payloads' => $payloads]);
                     \DB::table('collected_cards')->insert($payloads);
                 }
 

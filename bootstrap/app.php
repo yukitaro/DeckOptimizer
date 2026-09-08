@@ -14,10 +14,13 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->prepend(CorsMiddleware::class);
-        $middleware->web(EnsureFrontendRequestsAreStateful::class);
+    ->withMiddleware(function (Middleware $middleware) {
+        // Exempt all API routes from CSRF token checks
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+            'sanctum/csrf-cookie'
+        ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

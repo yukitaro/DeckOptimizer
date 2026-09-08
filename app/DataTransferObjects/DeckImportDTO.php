@@ -2,6 +2,8 @@
 
 namespace App\DataTransferObjects;
 
+use Illuminate\Http\Request;
+
 class DeckImportDTO implements \JsonSerializable
 {
     public function __construct(
@@ -28,4 +30,18 @@ class DeckImportDTO implements \JsonSerializable
             'tags' => $this->tags,
         ];
     }
+
+    public static function fromRequest(Request $request): self
+        {
+            return new self(
+                name: $request->input('name'),
+                mainboard: $request->input('mainboard', []),
+                sideboard: $request->input('sideboard', []),
+                format: $request->input('format'),
+                description: $request->input('description'),
+                sourceUrl: $request->input('sourceUrl'),
+                archetype: $request->input('archetype'),
+                tags: $request->input('tags', []),
+            );
+        }    
 }

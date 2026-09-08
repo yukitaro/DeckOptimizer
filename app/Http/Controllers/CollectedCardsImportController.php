@@ -18,6 +18,7 @@ class CollectedCardsImportController extends Controller
             'csv' => ['required', 'file', 'mimes:csv,txt', 'max:102400'],
             'mode' => ['required', 'in:merge,set,new'],
             'collection_id' => ['required', 'integer'],
+            'dedupe' => ['sometimes', 'boolean'],
         ]);
 
         $file = $request->file('csv');
@@ -35,7 +36,8 @@ Log::info('Dispatching import job', [
     'recordCount' => count($records),
     'cacheKey' => $cacheKey
 ]);        
-        ImportCollectedCardsFromCSV::dispatch($mode, $cacheKey, $collectionId);
+        $dedupe = $validated['dedupe'] ?? true;
+        ImportCollectedCardsFromCSV::dispatch($mode, $cacheKey, $collectionId, $dedupe);
 
         //ImportCollectedCardsFromCSV::dispatch($mode, $records, $collectionId)->delay(now());
 

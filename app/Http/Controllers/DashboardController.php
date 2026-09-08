@@ -189,7 +189,9 @@ class DashboardController extends Controller
         }
 
         // Total owned across all printings
-        $totalOwned = CollectedCardsFromSets::whereIn('card_data_id', $relatedPrintings->pluck('id'))->sum('card_count');
+        $totalOwned = CollectedCardsFromSets::whereIn('card_data_id', $relatedPrintings->pluck('id'))
+                                              ->inActiveInventory()
+                                              ->sum('card_count');
 
         // Deck usage across all normalized versions
         $normalizedIds = CardDataNormalized::whereIn('source_printing_id', $relatedPrintings->pluck('id'))->pluck('id');

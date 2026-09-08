@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminPermissionController;
 use App\Http\Controllers\AdminRoleController;
 use App\Http\Controllers\AdminUserController;
+use App\Http\Requests\UpdateCollectionRequest;
 
 use App\Http\Controllers\CollectedCardsImportController;
 use App\Http\Controllers\CollectionAnalyticsController;
@@ -57,7 +58,7 @@ Route::middleware('auth:sanctum')->get('/user', function () {
     return response()->json($user);
 });
 
-Route::get('/sets/{cardminimum?}', function (int $cardminimum = 85) {
+Route::get('/sets/{cardminimum?}', function (int $cardminimum = 83) {
     return SetData::where('total_cards', '>', $cardminimum)
     ->get();
 });
@@ -230,6 +231,8 @@ Route::get('/sideboard/{deck_id}', function ($deck_id) {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/deck', [DeckController::class, 'store']);
+    Route::post('/deck/fromDTO', [DeckController::class, 'storeFromDTO']);
+    Route::get('/deck/pauper-staples', [DeckController::class, 'getPauperStaples']);
 });
 
 Route::middleware('auth:sanctum')->get('/decks', function () {
@@ -267,6 +270,11 @@ Route::middleware('auth:sanctum')->group(function () {
 // Collections support
 Route::delete('/collections/{id}', [CollectionManagementController::class, 'destroy']);
 Route::get('/collections/{id}/export', [CollectionManagementController::class, 'export']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::patch('/collections/{collection}', [CollectionManagementController::class, 'update']);
+});
+
 
 Route::post('/test-image-url', function (Request $request) {
     $url = $request->input('url');
@@ -401,13 +409,18 @@ Route::middleware('auth:sanctum')->get('/collections', function () {
             'id' => $collection->id,
             'collection_name' => $collection->collection_name,
             'description' => $collection->description,
-            //'import_status' => $collection->import_status,
+            'type' => $collection->type,
+            'game_type' => $collection->game_type,
+            'owner_id' => $collection->owner_id,
+            'visibility' => $collection->visibility,
+            'is_favorite' => $collection->is_favorite,
+            'include_in_inventory' => $collection->include_in_inventory,
+            'import_status' => $collection->import_status,
             'total_cards' => $totalCards,
             'total_unique_cards' => $total_unique_cards
         ];
     });
 });
-
 
 Route::middleware('auth:sanctum')->post('/collections/create', function (Request $request) {
     \Log::debug('Authenticated user ID:', ['id' => auth()->id()]);
@@ -641,6 +654,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/lists/add-card', [ListManagementController::class, 'addCard']);
     Route::post('/lists/update-item', [ListManagementController::class, 'updateItem']);
     Route::post('/lists/delete-item', [ListManagementController::class, 'deleteItem']);
+    Route::post('/lists/bulk-add-cards', [ListManagementController::class, 'bulkAddCards']);
 });
 
 # Function stuff down here
